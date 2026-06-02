@@ -1,0 +1,53 @@
+<div class="app-shell">
+  <!-- Sidebar -->
+  <aside class="sidebar" [class.collapsed]="sidebarCollapsed">
+    <div class="sidebar-header">
+      <div class="logo">
+        <span class="logo-icon">💰</span>
+        <span class="logo-text" *ngIf="!sidebarCollapsed">BudgetSheet</span>
+      </div>
+      <button class="collapse-btn" (click)="toggleSidebar()" title="Réduire">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+      </button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a routerLink="/dashboard" routerLinkActive="active" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <rect x="3" y="3" width="7" height="7" rx="1"/>
+          <rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/>
+          <rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        <span *ngIf="!sidebarCollapsed">Tableau de bord</span>
+      </a>
+
+      <a routerLink="/investments" routerLinkActive="active" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+          <polyline points="16 7 22 7 22 13"/>
+        </svg>
+        <span *ngIf="!sidebarCollapsed">Investissements</span>
+      </a>
+
+      <a routerLink="/budget" routerLinkActive="active" class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+          <path d="M12 6v6l4 2"/>
+        </svg>
+        <span *ngIf="!sidebarCollapsed">Budget & Dépenses</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer" *ngIf="!sidebarCollapsed">
+      <div class="version-badge">v0.1.0 · Données fictives</div>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="main-content">
+    <router-outlet />
+  </main>
+</div>

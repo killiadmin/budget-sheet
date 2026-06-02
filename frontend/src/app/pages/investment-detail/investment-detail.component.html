@@ -1,0 +1,151 @@
+<div class="page" *ngIf="!loading && investment && metrics">
+  <!-- Back -->
+  <a routerLink="/investments" class="back-link">← Retour aux investissements</a>
+
+  <!-- Header -->
+  <div class="page-header" [style.--accent]="investment.color">
+    <div class="header-left">
+      <span class="big-icon">{{ investment.icon }}</span>
+      <div>
+        <h1>{{ investment.name }}</h1>
+        <p class="subtitle">{{ investment.type }} · Depuis {{ investment.dateAcquisition | date:'MMMM yyyy' }}</p>
+      </div>
+    </div>
+    <div class="status-badge" [class.active]="investment.statut === 'actif'">{{ investment.statut }}</div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-row">
+    <div class="kpi-box accent">
+      <div class="kl">Valeur actuelle</div>
+      <div class="kv">{{ formatCurrency(investment.valeurActuelle) }}</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kl">Capital investi</div>
+      <div class="kv">{{ formatCurrency(investment.capitalInvesti) }}</div>
+    </div>
+    <div class="kpi-box" [class.pos]="metrics.plusValueLatente >= 0" [class.neg]="metrics.plusValueLatente < 0">
+      <div class="kl">Plus-value latente</div>
+      <div class="kv">{{ metrics.plusValueLatente >= 0 ? '+' : '' }}{{ formatCurrency(metrics.plusValueLatente) }}</div>
+    </div>
+    <div class="kpi-box" [class.neg]="metrics.cashflowMensuelNet < 0" [class.pos]="metrics.cashflowMensuelNet >= 0">
+      <div class="kl">Cash-flow mensuel net</div>
+      <div class="kv">{{ metrics.cashflowMensuelNet >= 0 ? '+' : '' }}{{ formatCurrency(metrics.cashflowMensuelNet) }}</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kl">Rentabilité brute</div>
+      <div class="kv">{{ metrics.rentabiliteBrute | number:'1.2-2' }}%</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kl">Rentabilité nette</div>
+      <div class="kv">{{ metrics.rentabiliteNette | number:'1.2-2' }}%</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kl">ROI total</div>
+      <div class="kv">{{ metrics.roi | number:'1.1-1' }}%</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kl">Dépenses imprévues</div>
+      <div class="kv neg-light">{{ formatCurrency(metrics.totalDepensesImprevues) }}</div>
+    </div>
+  </div>
+
+  <!-- Charts row -->
+  <div class="charts-row">
+    <!-- Evolution chart -->
+    <div class="card chart-card">
+      <h3>Évolution 12 mois</h3>
+      <ngx-charts-line-chart
+        [results]="cashflowChartData"
+        [scheme]="colorScheme"
+        [xAxis]="true"
+        [yAxis]="true"
+        [legend]="true"
+        [autoScale]="true"
+        [view]="[700, 260]">
+      </ngx-charts-line-chart>
+    </div>
+
+    <!-- Charges pie -->
+    <div class="card pie-card" *ngIf="chargesData.length">
+      <h3>Répartition des charges</h3>
+      <ngx-charts-pie-chart
+        [results]="chargesData"
+        [scheme]="colorScheme"
+        [legend]="true"
+        [labels]="false"
+        [doughnut]="true"
+        [arcWidth]="0.4"
+        [view]="[800, 260]">
+      </ngx-charts-pie-chart>
+    </div>
+  </div>
+
+  <!-- Détails financiers -->
+  <div class="details-row">
+    <!-- Charges -->
+    <div class="card detail-card">
+      <h3>Charges mensuelles</h3>
+      <div class="detail-list">
+        <div class="detail-row" *ngFor="let c of chargesEntries">
+          <span class="dl">{{ c.label }}</span>
+          <span class="dv neg-light">−{{ formatCurrency(c.value) }}</span>
+        </div>
+        <div class="detail-row" *ngIf="investment.creditMensuel > 0">
+          <span class="dl">Crédit mensuel</span>
+          <span class="dv neg-light">−{{ formatCurrency(investment.creditMensuel) }}</span>
+        </div>
+        <div class="detail-separator"></div>
+        <div class="detail-row total">
+          <span class="dl">Total charges</span>
+          <span class="dv">{{ formatCurrency(metrics.totalChargesMensuelles) }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Revenus -->
+    <div class="card detail-card">
+      <h3>Revenus mensuels</h3>
+      <div class="detail-list">
+        <div class="detail-row" *ngFor="let r of revenusEntries">
+          <span class="dl">{{ r.label }}</span>
+          <span class="dv pos-light">+{{ formatCurrency(r.value) }}</span>
+        </div>
+        <div class="detail-separator"></div>
+        <div class="detail-row total">
+          <span class="dl">Total revenus</span>
+          <span class="dv">{{ formatCurrency(metrics.totalRevenusMensuels) }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dépenses imprévues -->
+    <div class="card detail-card" *ngIf="investment.depensesImprevues.length">
+      <h3>Dépenses imprévues</h3>
+      <div class="detail-list">
+        <div class="detail-row" *ngFor="let d of investment.depensesImprevues">
+          <div>
+            <div class="dl">{{ d.description }}</div>
+            <div class="ds">{{ d.date | date:'dd/MM/yyyy' }}</div>
+          </div>
+          <span class="dv neg-light">−{{ formatCurrency(d.montant) }}</span>
+        </div>
+        <div class="detail-separator"></div>
+        <div class="detail-row total">
+          <span class="dl">Total imprévus</span>
+          <span class="dv">{{ formatCurrency(metrics.totalDepensesImprevues) }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notes -->
+  <div class="card notes-card" *ngIf="investment.notes">
+    <h3>Notes</h3>
+    <p>{{ investment.notes }}</p>
+  </div>
+</div>
+
+<div class="loading-state" *ngIf="loading">
+  <div class="spinner"></div> Chargement…
+</div>

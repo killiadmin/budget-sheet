@@ -1,0 +1,71 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>Mes Investissements</h1>
+      <p class="subtitle">{{ investments.length }} feuilles · Vue consolidée</p>
+    </div>
+    <button class="btn-primary">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Nouvelle feuille
+    </button>
+  </div>
+
+  <div class="loading-state" *ngIf="loading">
+    <div class="spinner"></div>Chargement…
+  </div>
+
+  <div class="inv-grid" *ngIf="!loading">
+    <div class="inv-sheet"
+         *ngFor="let inv of investments"
+         [routerLink]="['/investments', inv.id]"
+         [style.--accent]="inv.color">
+
+      <div class="sheet-header">
+        <div class="sheet-title">
+          <span class="sheet-icon">{{ inv.icon }}</span>
+          <div>
+            <div class="sheet-name">{{ inv.name }}</div>
+            <div class="sheet-type">{{ typeLabel(inv.type) }}</div>
+          </div>
+        </div>
+        <div class="sheet-status" [class.active]="inv.statut === 'actif'">{{ inv.statut }}</div>
+      </div>
+
+      <div class="sheet-metrics">
+        <div class="metric">
+          <span class="metric-label">Valeur actuelle</span>
+          <span class="metric-value primary">{{ formatCurrency(inv.valeurActuelle) }}</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Capital investi</span>
+          <span class="metric-value">{{ formatCurrency(inv.capitalInvesti) }}</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Plus-value</span>
+          <span class="metric-value" [class.pos]="getMetrics(inv).plusValueLatente >= 0" [class.neg]="getMetrics(inv).plusValueLatente < 0">
+            {{ getMetrics(inv).plusValueLatente >= 0 ? '+' : '' }}{{ formatCurrency(getMetrics(inv).plusValueLatente) }}
+          </span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Cash-flow mensuel</span>
+          <span class="metric-value" [class.pos]="getMetrics(inv).cashflowMensuelNet >= 0" [class.neg]="getMetrics(inv).cashflowMensuelNet < 0">
+            {{ getMetrics(inv).cashflowMensuelNet >= 0 ? '+' : '' }}{{ formatCurrency(getMetrics(inv).cashflowMensuelNet) }}
+          </span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Rentabilité brute</span>
+          <span class="metric-value">{{ getMetrics(inv).rentabiliteBrute | number:'1.1-1' }}%</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Rentabilité nette</span>
+          <span class="metric-value">{{ getMetrics(inv).rentabiliteNette | number:'1.1-1' }}%</span>
+        </div>
+      </div>
+
+      <div class="sheet-footer">
+        <span class="footer-date">Depuis {{ inv.dateAcquisition | date:'MMM yyyy' }}</span>
+        <span class="footer-link">Voir la feuille →</span>
+      </div>
+    </div>
+  </div>
+</div>

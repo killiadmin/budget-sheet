@@ -1,0 +1,193 @@
+<div class="dashboard">
+  <!-- Header -->
+  <div class="page-header">
+    <div>
+      <h1>Tableau de bord</h1>
+      <p class="subtitle">Vue d'ensemble de votre patrimoine · Données 2024</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-secondary" routerLink="/investments">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Ajouter
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-state" *ngIf="loading">
+    <div class="spinner"></div>
+    <span>Chargement des données…</span>
+  </div>
+
+  <ng-container *ngIf="!loading">
+
+    <!-- KPI Grid -->
+    <div class="kpi-grid">
+      <div class="kpi-card kpi-primary">
+        <div class="kpi-label">Patrimoine total</div>
+        <div class="kpi-value">{{ formatCurrency(totalPatrimoine) }}</div>
+        <div class="kpi-sub kpi-up">+{{ formatCurrency(plusValueTotale) }} plus-value latente</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">Capital investi</div>
+        <div class="kpi-value">{{ formatCurrency(totalCapitalInvesti) }}</div>
+        <div class="kpi-sub">Fonds propres engagés</div>
+      </div>
+
+      <div class="kpi-card" [class.kpi-danger]="cashflowMensuelTotal < 0">
+        <div class="kpi-label">Cash-flow mensuel net</div>
+        <div class="kpi-value" [class.negative]="cashflowMensuelTotal < 0">
+          {{ formatCurrency(cashflowMensuelTotal) }}
+        </div>
+        <div class="kpi-sub">Tous investissements confondus</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">Revenus invest. / mois</div>
+        <div class="kpi-value kpi-green">{{ formatCurrency(revenusInvestissements) }}</div>
+        <div class="kpi-sub">Loyers + dividendes</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">Dépenses moy. / mois</div>
+        <div class="kpi-value">{{ formatCurrency(depensesMoyennesMensuelles) }}</div>
+        <div class="kpi-sub">Moyenne 12 mois</div>
+      </div>
+
+      <div class="kpi-card" [class.kpi-success]="tauxEpargne > 20">
+        <div class="kpi-label">Taux d'épargne</div>
+        <div class="kpi-value">{{ tauxEpargne | number:'1.1-1' }}%</div>
+        <div class="kpi-sub">Revenu net + invest.</div>
+      </div>
+    </div>
+
+    <!-- Charts Row 1 -->
+    <div class="charts-row">
+      <!-- Répartition patrimoine -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <h3>Répartition du patrimoine</h3>
+          <span class="chart-period">Valeur actuelle</span>
+        </div>
+        <ngx-charts-pie-chart
+          [results]="patrimoineChartData"
+          [scheme]="colorScheme"
+          [legend]="true"
+          [labels]="false"
+          [doughnut]="true"
+          [arcWidth]="0.35"
+          [gradient]="false"
+          [tooltipDisabled]="false"
+          [view]="[380, 280]">
+        </ngx-charts-pie-chart>
+      </div>
+
+      <!-- Dépenses par catégorie -->
+      <div class="chart-card chart-wide">
+        <div class="chart-header">
+          <h3>Dépenses moyennes par catégorie</h3>
+          <span class="chart-period">Moyenne mensuelle 2024</span>
+        </div>
+        <ngx-charts-bar-horizontal
+          [results]="depensesChartData"
+          [scheme]="colorScheme"
+          [xAxis]="true"
+          [yAxis]="true"
+          [showXAxisLabel]="false"
+          [showYAxisLabel]="false"
+          [gradient]="false"
+          [view]="[520, 280]"
+          [barPadding]="6">
+        </ngx-charts-bar-horizontal>
+      </div>
+    </div>
+
+    <!-- Charts Row 2 -->
+    <div class="charts-row">
+      <!-- Cash-flow immobilier -->
+      <div class="chart-card chart-full" *ngIf="cashflowChartData.length">
+        <div class="chart-header">
+          <h3>Cash-flow immobilier · 6 derniers mois</h3>
+          <span class="chart-period">Revenus − Charges</span>
+        </div>
+        <ngx-charts-bar-vertical-2d
+          [results]="cashflowChartData"
+          [scheme]="colorScheme"
+          [xAxis]="true"
+          [yAxis]="true"
+          [legend]="true"
+          [gradient]="false"
+          [view]="[960, 260]"
+          [barPadding]="4"
+          [groupPadding]="16">
+        </ngx-charts-bar-vertical-2d>
+      </div>
+    </div>
+
+    <!-- Évolution placements financiers -->
+    <div class="charts-row" *ngIf="evolutionPatrimoineData.length">
+      <div class="chart-card chart-full">
+        <div class="chart-header">
+          <h3>Évolution des placements financiers</h3>
+          <span class="chart-period">Valeur de portefeuille 2024</span>
+        </div>
+        <ngx-charts-line-chart
+          [results]="evolutionPatrimoineData"
+          [scheme]="colorScheme"
+          [xAxis]="true"
+          [yAxis]="true"
+          [legend]="true"
+          [autoScale]="true"
+          [view]="[960, 260]">
+        </ngx-charts-line-chart>
+      </div>
+    </div>
+
+    <!-- Investments Summary Table -->
+    <div class="section-card">
+      <div class="chart-header">
+        <h3>Synthèse des investissements</h3>
+        <a routerLink="/investments" class="link-all">Voir tout →</a>
+      </div>
+      <div class="table-wrapper">
+        <table class="inv-table">
+          <thead>
+          <tr>
+            <th>Investissement</th>
+            <th>Type</th>
+            <th class="right">Capital investi</th>
+            <th class="right">Valeur actuelle</th>
+            <th class="right">Plus-value</th>
+            <th class="right">Cash-flow / mois</th>
+            <th class="right">Rentabilité nette</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr *ngFor="let item of investmentsSummary" class="table-row" [routerLink]="['/investments', item.inv.id]">
+            <td>
+              <div class="inv-name">
+                <span class="inv-dot" [style.background]="item.inv.color"></span>
+                {{ item.inv.icon }} {{ item.inv.name }}
+              </div>
+            </td>
+            <td><span class="type-badge">{{ typeLabel(item.inv.type) }}</span></td>
+            <td class="right mono">{{ formatCurrency(item.inv.capitalInvesti) }}</td>
+            <td class="right mono">{{ formatCurrency(item.inv.valeurActuelle) }}</td>
+            <td class="right mono" [class.pos]="item.metrics.plusValueLatente >= 0" [class.neg]="item.metrics.plusValueLatente < 0">
+              {{ item.metrics.plusValueLatente >= 0 ? '+' : '' }}{{ formatCurrency(item.metrics.plusValueLatente) }}
+            </td>
+            <td class="right mono" [class.pos]="item.metrics.cashflowMensuelNet >= 0" [class.neg]="item.metrics.cashflowMensuelNet < 0">
+              {{ item.metrics.cashflowMensuelNet >= 0 ? '+' : '' }}{{ formatCurrency(item.metrics.cashflowMensuelNet) }}
+            </td>
+            <td class="right mono" [class.pos]="item.metrics.rentabiliteNette >= 0">
+              {{ item.metrics.rentabiliteNette | number:'1.1-1' }}%
+            </td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </ng-container>
+</div>
