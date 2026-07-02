@@ -2,7 +2,7 @@
   <div class="page-header">
     <div>
       <h1>Mes Investissements</h1>
-      <p class="subtitle">{{ investments.length }} feuilles · Vue consolidée</p>
+      <p class="subtitle">{{ investments.length }} feuilles · {{ fmt(totalPatrimoine) }} de patrimoine</p>
     </div>
     <button class="btn-primary">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -10,13 +10,31 @@
     </button>
   </div>
 
-  <div class="loading-state" *ngIf="loading">
-    <div class="spinner"></div>Chargement…
+  <!-- Récap totaux -->
+  <div class="recap-row" *ngIf="!loading">
+    <div class="recap-chip">💰 Capital investi : <strong>{{ fmt(totalCapital) }}</strong></div>
+    <div class="recap-chip" [class.pos]="totalPlusValue >= 0" [class.neg]="totalPlusValue < 0">
+      📊 Plus-value totale : <strong>{{ totalPlusValue >= 0 ? '+' : '' }}{{ fmt(totalPlusValue) }}</strong>
+    </div>
+    <div class="recap-chip">🏦 Valeur totale : <strong>{{ fmt(totalPatrimoine) }}</strong></div>
   </div>
+
+  <!-- Filtres par type -->
+  <div class="filter-row">
+    <button
+      *ngFor="let t of allTypes"
+      class="filter-btn"
+      [class.active]="filterType === t.value"
+      (click)="filterType = t.value">
+      {{ t.label }}
+    </button>
+  </div>
+
+  <div class="loading-state" *ngIf="loading"><div class="spinner"></div>Chargement…</div>
 
   <div class="inv-grid" *ngIf="!loading">
     <div class="inv-sheet"
-         *ngFor="let inv of investments"
+         *ngFor="let inv of filtered"
          [routerLink]="['/investments', inv.id]"
          [style.--accent]="inv.color">
 
@@ -25,47 +43,87 @@
           <span class="sheet-icon">{{ inv.icon }}</span>
           <div>
             <div class="sheet-name">{{ inv.name }}</div>
-            <div class="sheet-type">{{ typeLabel(inv.type) }}</div>
+            <div class="sheet-type">{{ investService.typeLabel(inv.type) }}</div>
           </div>
         </div>
         <div class="sheet-status" [class.active]="inv.statut === 'actif'">{{ inv.statut }}</div>
       </div>
 
+      <!-- Métriques adaptées au type -->
       <div class="sheet-metrics">
         <div class="metric">
           <span class="metric-label">Valeur actuelle</span>
-          <span class="metric-value primary">{{ formatCurrency(inv.valeurActuelle) }}</span>
+          <span class="metric-value primary">{{ fmt(inv.valeurActuelle) }}</span>
         </div>
         <div class="metric">
           <span class="metric-label">Capital investi</span>
-          <span class="metric-value">{{ formatCurrency(inv.capitalInvesti) }}</span>
+          <span class="metric-value">{{ fmt(inv.capitalInvesti) }}</span>
         </div>
-        <div class="metric">
-          <span class="metric-label">Plus-value</span>
-          <span class="metric-value" [class.pos]="getMetrics(inv).plusValueLatente >= 0" [class.neg]="getMetrics(inv).plusValueLatente < 0">
-            {{ getMetrics(inv).plusValueLatente >= 0 ? '+' : '' }}{{ formatCurrency(getMetrics(inv).plusValueLatente) }}
+
+        <!-- Plus-value / marge -->
+        <ng-container *ngIf="inv.type !== 'type_b'">
+          <div class="metric">
+            <span class="metric-label">Plus-value</span>
+            <span class="metric-value"
+                  [class.pos]="investService.computeMetrics(inv).plusValueLatente >= 0"
+                  [class.neg]="investService.computeMetrics(inv).plusValueLatente < 0">
+              {{ investService.computeMetrics(inv).plusValueLatente >= 0 ? '+' : '' }}{{ fmt(investService.computeMetrics(inv).plusValueLatente) }}
+            </span>
+          </div>
+        </ng-container>
+
+        <ng-container *ngIf="inv.type === 'type_b'">
+          <div class="metric">
+            <span class="metric-label">Marge estimée</span>
+            <span class="metric-value"
+                  [class.pos]="(investService.computeMetrics(inv).margeRevente ?? 0) >= 0"
+                  [class.neg]="(investService.computeMetrics(inv).margeRevente ?? 0) < 0">
+              {{ fmt(investService.computeMetrics(inv).margeRevente ?? 0) }}
+            </span>
+          </div>
+        </ng-container>
+
+        <!-- Cash-flow (type A) -->
+        <div class="metric" *ngIf="inv.type === 'type_a'">
+          <span class="metric-label">Cash-flow / mois</span>
+          <span class="metric-value"
+                [class.pos]="investService.computeMetrics(inv).cashflowMensuelNet >= 0"
+                [class.neg]="investService.computeMetrics(inv).cashflowMensuelNet < 0">
+            {{ investService.computeMetrics(inv).cashflowMensuelNet >= 0 ? '+' : '' }}{{ fmt(investService.computeMetrics(inv).cashflowMensuelNet) }}
           </span>
         </div>
+
+        <!-- Perf % -->
         <div class="metric">
-          <span class="metric-label">Cash-flow mensuel</span>
-          <span class="metric-value" [class.pos]="getMetrics(inv).cashflowMensuelNet >= 0" [class.neg]="getMetrics(inv).cashflowMensuelNet < 0">
-            {{ getMetrics(inv).cashflowMensuelNet >= 0 ? '+' : '' }}{{ formatCurrency(getMetrics(inv).cashflowMensuelNet) }}
+          <span class="metric-label">Performance</span>
+          <span class="metric-value"
+                [class.pos]="investService.computeMetrics(inv).performancePct >= 0"
+                [class.neg]="investService.computeMetrics(inv).performancePct < 0">
+            {{ fmtPct(investService.computeMetrics(inv).performancePct) }}
           </span>
         </div>
-        <div class="metric">
-          <span class="metric-label">Rentabilité brute</span>
-          <span class="metric-value">{{ getMetrics(inv).rentabiliteBrute | number:'1.1-1' }}%</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">Rentabilité nette</span>
-          <span class="metric-value">{{ getMetrics(inv).rentabiliteNette | number:'1.1-1' }}%</span>
+
+        <!-- Rendement (types financiers) -->
+        <div class="metric" *ngIf="investService.computeMetrics(inv).rendementAnnuelNet !== undefined">
+          <span class="metric-label">Rendement annuel</span>
+          <span class="metric-value">{{ fmtPct(investService.computeMetrics(inv).rendementAnnuelNet) }}</span>
         </div>
       </div>
 
+      <!-- Tags -->
+      <div class="sheet-tags" *ngIf="inv.tags?.length">
+        <span class="sheet-tag" *ngFor="let t of inv.tags?.slice(0,3)">{{ t }}</span>
+      </div>
+
       <div class="sheet-footer">
-        <span class="footer-date">Depuis {{ inv.dateAcquisition | date:'MMM yyyy' }}</span>
+        <span class="footer-date">Depuis {{ inv.dateOuverture | date:'MMM yyyy' }}</span>
         <span class="footer-link">Voir la feuille →</span>
       </div>
+    </div>
+
+    <!-- Empty state -->
+    <div class="empty-state" *ngIf="filtered.length === 0">
+      <span>Aucun investissement de ce type.</span>
     </div>
   </div>
 </div>

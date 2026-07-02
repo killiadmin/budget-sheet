@@ -77,7 +77,8 @@
         [results]="repartitionFixeData"
         [scheme]="colorScheme"
         [legend]="true"
-        [labels]="false"
+        [labels]="true"
+        [maxLabelLength]="24"
         [doughnut]="true"
         [arcWidth]="0.38"
         [view]="[340, 280]">
@@ -95,7 +96,8 @@
       [yAxis]="true"
       [legend]="true"
       [view]="[960, 280]"
-      [barPadding]="12">
+      [barPadding]="12"
+      [showDataLabel]="true">
     </ngx-charts-bar-vertical-stacked>
   </div>
 

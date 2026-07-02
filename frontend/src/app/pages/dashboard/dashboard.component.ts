@@ -1,8 +1,9 @@
-import { Component, OnInit, inject } from '@angular/core';
-import { CommonModule, DecimalPipe } from '@angular/common';
+import { Component, OnInit, AfterViewInit, OnDestroy, ElementRef, ViewChild, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { NgxChartsModule, Color, ScaleType } from '@swimlane/ngx-charts';
+import { curveMonotoneX } from 'd3-shape';
 
 import { InvestmentService } from '../../services/investment.service';
 import { BudgetService } from '../../services/budget.service';
@@ -11,20 +12,36 @@ import { BudgetData } from '../../models/budget.model';
 
 @Component({
   selector: 'app-dashboard',
-  imports: [CommonModule, RouterLink, NgxChartsModule, DecimalPipe],
+  imports: [CommonModule, RouterLink, NgxChartsModule],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css'
 })
-export class DashboardComponent implements OnInit {
-  private investService = inject(InvestmentService);
-  private budgetService = inject(BudgetService);
+export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
+  readonly investService = inject(InvestmentService);
+  private budgetService  = inject(BudgetService);
+
+  @ViewChild('pieChartHost')       pieChartHost?: ElementRef;
+  @ViewChild('barHorizontalHost')  barHorizontalHost?: ElementRef;
+  @ViewChild('cashflowChartHost')  cashflowChartHost?: ElementRef;
+  @ViewChild('evolutionChartHost') evolutionChartHost?: ElementRef;
+
+  // Tailles par défaut (avant mesure réelle du conteneur)
+  pieView:            [number, number] = [380, 300];
+  barHorizontalView:  [number, number] = [520, 300];
+  cashflowView:        [number, number] = [960, 260];
+  evolutionView:       [number, number] = [960, 260];
+
+  private resizeObserver?: ResizeObserver;
 
   investments: Investment[] = [];
   budget: BudgetData | null = null;
   loading = true;
+  curve = curveMonotoneX;
 
   // KPIs
   totalPatrimoine = 0;
+  totalDetteRestante = 0;
+  patrimoineNet = 0;
   totalCapitalInvesti = 0;
   cashflowMensuelTotal = 0;
   plusValueTotale = 0;
@@ -32,36 +49,83 @@ export class DashboardComponent implements OnInit {
   depensesMoyennesMensuelles = 0;
   tauxEpargne = 0;
 
-  // Chart data
+  // Charts
   patrimoineChartData: any[] = [];
   cashflowChartData: any[] = [];
   depensesChartData: any[] = [];
-  evolutionPatrimoineData: any[] = [];
+  evolutionFinancierData: any[] = [];
 
   colorScheme: Color = {
     name: 'custom',
     selectable: false,
     group: ScaleType.Ordinal,
-    domain: ['#818cf8', '#34d399', '#f59e0b', '#f87171', '#a78bfa', '#38bdf8']
+    domain: ['#818cf8', '#34d399', '#f59e0b', '#f87171', '#a78bfa', '#38bdf8', '#fb923c', '#84cc16']
   };
 
   ngOnInit() {
-    forkJoin({
-      investments: this.investService.getAll(),
-      budget: this.budgetService.getBudget()
-    }).subscribe(({ investments, budget }) => {
-      this.investments = investments;
-      this.budget = budget;
-      this.computeKpis();
-      this.prepareCharts();
-      this.loading = false;
-    });
+    forkJoin({ investments: this.investService.getAll(), budget: this.budgetService.getBudget() })
+      .subscribe(({ investments, budget }) => {
+        this.investments = investments;
+        this.budget = budget;
+        this.computeKpis();
+        this.prepareCharts();
+        this.loading = false;
+        // Les hôtes des graphiques n'existent qu'une fois *ngIf="!loading" rendu.
+        setTimeout(() => this.attachResizeObserver(), 0);
+      });
+  }
+
+  ngAfterViewInit() {
+    this.attachResizeObserver();
+  }
+
+  ngOnDestroy() {
+    this.resizeObserver?.disconnect();
+  }
+
+  private attachResizeObserver() {
+    if (!this.resizeObserver) {
+      this.resizeObserver = new ResizeObserver(() => this.updateSizes());
+    }
+    [this.pieChartHost, this.barHorizontalHost, this.cashflowChartHost, this.evolutionChartHost]
+      .forEach(host => { if (host?.nativeElement) this.resizeObserver!.observe(host.nativeElement); });
+    this.updateSizes();
+  }
+
+  private updateSizes() {
+    const width = (host?: ElementRef) => host?.nativeElement?.offsetWidth ?? 0;
+
+    const pieW = width(this.pieChartHost);
+    if (pieW > 0) this.pieView = [Math.max(pieW - 180, 160), 300];
+
+    const barW = width(this.barHorizontalHost);
+    if (barW > 0) this.barHorizontalView = [Math.max(barW - 16, 200), 300];
+
+    const cashflowW = width(this.cashflowChartHost);
+    if (cashflowW > 0) this.cashflowView = [Math.max(cashflowW - 180, 300), 260];
+
+    const evolutionW = width(this.evolutionChartHost);
+    if (evolutionW > 0) this.evolutionView = [Math.max(evolutionW - 180, 300), 260];
   }
 
   private computeKpis() {
-    this.totalPatrimoine = this.investments.reduce((s, i) => s + i.valeurActuelle, 0);
+    this.totalPatrimoine    = this.investments.reduce((s, i) => s + i.valeurActuelle, 0);
     this.totalCapitalInvesti = this.investments.reduce((s, i) => s + i.capitalInvesti, 0);
-    this.plusValueTotale = this.totalPatrimoine - this.investments.reduce((s, i) => s + i.prixAchat, 0);
+
+    // Somme des plus-values réelles par investissement (via computeMetrics, qui gère
+    // le calcul spécifique par type — ex: base prixAcquisition pour le type A, margeRevente
+    // pour le type B) plutôt que la formule générique totalPatrimoine - totalCapitalInvesti,
+    // qui ne correspond pas à la réalité pour un bien financé à crédit.
+    this.plusValueTotale = this.investments.reduce((s, inv) => {
+      return s + this.investService.computeMetrics(inv).plusValueLatente;
+    }, 0);
+
+    // Dette restante (crédits en cours, type A) : la valeur actuelle d'un bien financé
+    // à crédit n'appartient pas intégralement à l'investisseur tant que le prêt court.
+    this.totalDetteRestante = this.investments.reduce((s, i) => {
+      return s + (i.detailTypeA?.soldeFinancementRestant ?? 0);
+    }, 0);
+    this.patrimoineNet = this.totalPatrimoine - this.totalDetteRestante;
 
     this.cashflowMensuelTotal = this.investments.reduce((s, inv) => {
       const m = this.investService.computeMetrics(inv);
@@ -69,8 +133,7 @@ export class DashboardComponent implements OnInit {
     }, 0);
 
     this.revenusInvestissements = this.investments.reduce((s, inv) => {
-      const m = this.investService.computeMetrics(inv);
-      return s + m.totalRevenusMensuels;
+      return s + this.investService.totalRevenusMensuels(inv);
     }, 0);
 
     if (this.budget) {
@@ -85,87 +148,58 @@ export class DashboardComponent implements OnInit {
     // Répartition patrimoine par type
     const byType: Record<string, number> = {};
     this.investments.forEach(inv => {
-      const label = this.typeLabel(inv.type);
+      const label = this.investService.typeLabel(inv.type as any).replace(/^. /, '');
       byType[label] = (byType[label] ?? 0) + inv.valeurActuelle;
     });
     this.patrimoineChartData = Object.entries(byType).map(([name, value]) => ({ name, value }));
 
-    // Cashflow mensuel des 6 derniers mois (investissements locatifs)
-    const moisLabels = ['Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
-    const immo = this.investments.filter(i => i.type === 'immobilier_locatif');
-
-    this.cashflowChartData = immo.map(inv => ({
+    // Cashflow type A, 6 derniers mois
+    const typeA = this.investments.filter(i => i.type === 'type_a');
+    const moisLabels = ['Jul','Aoû','Sep','Oct','Nov','Déc'];
+    this.cashflowChartData = typeA.map(inv => ({
       name: inv.name,
-      series: inv.historiqueCashflow.slice(-6).map((cf, idx) => ({
+      series: inv.historique.slice(-6).map((cf, idx) => ({
         name: moisLabels[idx],
         value: cf.cashflow ?? 0
       }))
     }));
 
-    // Dépenses par catégorie (moyenne)
+    // Dépenses par catégorie
     if (this.budget) {
       const catSum: Record<string, number> = {};
-      const catCount: Record<string, number> = {};
-      this.budget.historiqueDepenses.forEach(mois => {
-        mois.details.forEach(d => {
+      const catCnt: Record<string, number> = {};
+      this.budget.historiqueDepenses.forEach(m => {
+        m.details.forEach(d => {
           catSum[d.categorie] = (catSum[d.categorie] ?? 0) + d.montant;
-          catCount[d.categorie] = (catCount[d.categorie] ?? 0) + 1;
+          catCnt[d.categorie] = (catCnt[d.categorie] ?? 0) + 1;
         });
       });
       this.depensesChartData = Object.entries(catSum).map(([name, total]) => ({
-        name,
-        value: Math.round(total / (catCount[name] || 1))
+        name, value: Math.round(total / (catCnt[name] || 1))
       }));
     }
 
-    // Évolution valeur totale des placements financiers
-    const financier = this.investments.find(i => i.type === 'bourse');
-    const av = this.investments.find(i => i.type === 'assurance_vie');
-    if (financier && av) {
-      this.evolutionPatrimoineData = [
-        {
-          name: 'ETF',
-          series: financier.historiqueCashflow.slice(-12).map(cf => ({
-            name: this.shortMonth(cf.mois),
-            value: cf.valeur ?? 0
-          }))
-        },
-        {
-          name: 'Assurance Vie',
-          series: av.historiqueCashflow.slice(-12).map(cf => ({
-            name: this.shortMonth(cf.mois),
-            value: cf.valeur ?? 0
-          }))
-        }
-      ];
-    }
+    // Évolution types financiers (C + D)
+    const financiers = this.investments.filter(i => ['type_c', 'type_d'].includes(i.type));
+    this.evolutionFinancierData = financiers.map(inv => ({
+      name: inv.name,
+      series: inv.historique.slice(-12).map(h => ({
+        name: this.shortMonth(h.date),
+        value: h.valeurPortefeuille ?? 0
+      }))
+    })).filter(s => s.series.some(p => p.value > 0));
   }
 
-  typeLabel(type: string): string {
-    const map: Record<string, string> = {
-      immobilier_locatif: 'Immobilier',
-      bourse: 'Bourse',
-      assurance_vie: 'Assurance Vie',
-      crypto: 'Crypto',
-      autre: 'Autre'
-    };
-    return map[type] ?? type;
+  private shortMonth(date: string): string {
+    const [, m] = date.split('-');
+    return ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'][parseInt(m, 10) - 1];
   }
 
-  private shortMonth(mois: string): string {
-    const [, m] = mois.split('-');
-    const months = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
-    return months[parseInt(m, 10) - 1];
-  }
-
-  formatCurrency(v: number): string {
+  fmt(v: number): string {
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v);
   }
 
-  get investmentsSummary() {
-    return this.investments.map(inv => ({
-      inv,
-      metrics: this.investService.computeMetrics(inv)
-    }));
+  get summaryRows() {
+    return this.investments.map(inv => ({ inv, m: this.investService.computeMetrics(inv) }));
   }
 }

@@ -1,149 +1,661 @@
 <div class="page" *ngIf="!loading && investment && metrics">
-  <!-- Back -->
+
+  <!-- ── Navigation ── -->
   <a routerLink="/investments" class="back-link">← Retour aux investissements</a>
 
-  <!-- Header -->
+  <!-- ── Header ── -->
   <div class="page-header" [style.--accent]="investment.color">
     <div class="header-left">
       <span class="big-icon">{{ investment.icon }}</span>
       <div>
         <h1>{{ investment.name }}</h1>
-        <p class="subtitle">{{ investment.type }} · Depuis {{ investment.dateAcquisition | date:'MMMM yyyy' }}</p>
+        <p class="subtitle">
+          {{ investService.typeLabel(investment.type) }}
+          · Depuis {{ investment.dateOuverture | date:'MMMM yyyy' }}
+          <span *ngIf="metrics.dureeDetentionMois"> · {{ metrics.dureeDetentionMois }} mois</span>
+        </p>
+        <div class="tags" *ngIf="investment.tags?.length">
+          <span class="tag" *ngFor="let t of investment.tags">{{ t }}</span>
+        </div>
       </div>
     </div>
-    <div class="status-badge" [class.active]="investment.statut === 'actif'">{{ investment.statut }}</div>
+    <div class="status-badge" [class.active]="investment.statut === 'actif'">
+      {{ investment.statut }}
+    </div>
   </div>
 
-  <!-- KPIs -->
+  <!-- ── KPIs génériques ── -->
   <div class="kpi-row">
     <div class="kpi-box accent">
       <div class="kl">Valeur actuelle</div>
-      <div class="kv">{{ formatCurrency(investment.valeurActuelle) }}</div>
+      <div class="kv">{{ fmt(investment.valeurActuelle) }}</div>
     </div>
     <div class="kpi-box">
       <div class="kl">Capital investi</div>
-      <div class="kv">{{ formatCurrency(investment.capitalInvesti) }}</div>
+      <div class="kv">{{ fmt(investment.capitalInvesti) }}</div>
     </div>
-    <div class="kpi-box" [class.pos]="metrics.plusValueLatente >= 0" [class.neg]="metrics.plusValueLatente < 0">
-      <div class="kl">Plus-value latente</div>
-      <div class="kv">{{ metrics.plusValueLatente >= 0 ? '+' : '' }}{{ formatCurrency(metrics.plusValueLatente) }}</div>
-    </div>
-    <div class="kpi-box" [class.neg]="metrics.cashflowMensuelNet < 0" [class.pos]="metrics.cashflowMensuelNet >= 0">
+
+    <!-- Plus-value / marge selon type -->
+    <ng-container *ngIf="!isTypeB()">
+      <div class="kpi-box" [class.pos]="metrics.plusValueLatente >= 0" [class.neg]="metrics.plusValueLatente < 0">
+        <div class="kl">Plus-value latente</div>
+        <div class="kv">{{ metrics.plusValueLatente >= 0 ? '+' : '' }}{{ fmt(metrics.plusValueLatente) }}</div>
+        <div class="kl mt4">{{ fmtPct(metrics.performancePct) }}</div>
+      </div>
+    </ng-container>
+
+    <ng-container *ngIf="isTypeB() && metrics.margeRevente !== undefined">
+      <div class="kpi-box" [class.pos]="metrics.margeRevente >= 0" [class.neg]="metrics.margeRevente < 0">
+        <div class="kl">Marge nette estimée</div>
+        <div class="kv">{{ fmt(metrics.margeRevente) }}</div>
+        <div class="kl mt4">{{ fmtPct(metrics.margePct) }}</div>
+      </div>
+    </ng-container>
+
+    <!-- Cash-flow (types A + F) -->
+    <div class="kpi-box" *ngIf="hasChargesOuRevenus()"
+         [class.neg]="metrics.cashflowMensuelNet < 0" [class.pos]="metrics.cashflowMensuelNet >= 0">
       <div class="kl">Cash-flow mensuel net</div>
-      <div class="kv">{{ metrics.cashflowMensuelNet >= 0 ? '+' : '' }}{{ formatCurrency(metrics.cashflowMensuelNet) }}</div>
+      <div class="kv">{{ metrics.cashflowMensuelNet >= 0 ? '+' : '' }}{{ fmt(metrics.cashflowMensuelNet) }}</div>
     </div>
-    <div class="kpi-box">
-      <div class="kl">Rentabilité brute</div>
-      <div class="kv">{{ metrics.rentabiliteBrute | number:'1.2-2' }}%</div>
+
+    <!-- Rentabilités (type A) -->
+    <ng-container *ngIf="isTypeA()">
+      <div class="kpi-box">
+        <div class="kl">Rentabilité brute</div>
+        <div class="kv">{{ metrics.rentabiliteBrute | number:'1.2-2' }}%</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kl">Rentabilité nette</div>
+        <div class="kv">{{ metrics.rentabiliteNette | number:'1.2-2' }}%</div>
+      </div>
+    </ng-container>
+
+    <!-- Rendement annuel (types financiers / F) -->
+    <div class="kpi-box" *ngIf="(isFinancier() || isTypeF()) && metrics.rendementAnnuelNet !== undefined">
+      <div class="kl">Rendement annuel net</div>
+      <div class="kv">{{ metrics.rendementAnnuelNet | number:'1.2-2' }}%</div>
     </div>
+
+    <!-- ROI -->
     <div class="kpi-box">
-      <div class="kl">Rentabilité nette</div>
-      <div class="kv">{{ metrics.rentabiliteNette | number:'1.2-2' }}%</div>
+      <div class="kl">ROI annualisé</div>
+      <div class="kv" [class.pos]="metrics.roi >= 0" [class.neg]="metrics.roi < 0">
+        {{ fmtPct(metrics.roi) }}
+      </div>
     </div>
-    <div class="kpi-box">
-      <div class="kl">ROI total</div>
-      <div class="kv">{{ metrics.roi | number:'1.1-1' }}%</div>
-    </div>
-    <div class="kpi-box">
-      <div class="kl">Dépenses imprévues</div>
-      <div class="kv neg-light">{{ formatCurrency(metrics.totalDepensesImprevues) }}</div>
+
+    <!-- Événements négatifs -->
+    <div class="kpi-box" *ngIf="metrics.totalSortiesEvenements > 0">
+      <div class="kl">Dépenses événements</div>
+      <div class="kv" style="color:#f87171">−{{ fmt(metrics.totalSortiesEvenements) }}</div>
     </div>
   </div>
 
-  <!-- Charts row -->
-  <div class="charts-row">
-    <!-- Evolution chart -->
-    <div class="card chart-card">
-      <h3>Évolution 12 mois</h3>
-      <ngx-charts-line-chart
-        [results]="cashflowChartData"
-        [scheme]="colorScheme"
-        [xAxis]="true"
-        [yAxis]="true"
-        [legend]="true"
-        [autoScale]="true"
-        [view]="[700, 260]">
-      </ngx-charts-line-chart>
+  <!-- ══════════════════════════════════════════════════════════
+       SECTION TYPE B — Avancement
+  ══════════════════════════════════════════════════════════ -->
+  <ng-container *ngIf="isTypeB() && investment.detailTypeB as d">
+    <div class="section-title">Avancement du projet</div>
+    <div class="flip-progress-row">
+      <div class="card flip-kpi">
+        <div class="kl">Prix d'acquisition</div><div class="kv">{{ fmt(d.prixAcquisition) }}</div>
+      </div>
+      <div class="card flip-kpi">
+        <div class="kl">Frais d'acquisition</div><div class="kv">−{{ fmt(d.fraisAcquisition) }}</div>
+      </div>
+      <div class="card flip-kpi">
+        <div class="kl">Budget dépenses</div><div class="kv">{{ fmt(d.budgetTransformation) }}</div>
+      </div>
+      <div class="card flip-kpi">
+        <div class="kl">Dépenses réalisées</div>
+        <div class="kv" [style.color]="d.depenseTransformation > d.budgetTransformation ? '#f87171' : '#34d399'">
+          {{ fmt(d.depenseTransformation) }}
+        </div>
+      </div>
+      <div class="card flip-kpi">
+        <div class="kl">Valeur cible de sortie</div><div class="kv" style="color:#34d399">{{ fmt(d.valeurCibleSortie) }}</div>
+      </div>
     </div>
 
-    <!-- Charges pie -->
-    <div class="card pie-card" *ngIf="chargesData.length">
-      <h3>Répartition des charges</h3>
-      <ngx-charts-pie-chart
-        [results]="chargesData"
-        [scheme]="colorScheme"
-        [legend]="true"
-        [labels]="false"
-        [doughnut]="true"
-        [arcWidth]="0.4"
-        [view]="[800, 260]">
-      </ngx-charts-pie-chart>
-    </div>
-  </div>
-
-  <!-- Détails financiers -->
-  <div class="details-row">
-    <!-- Charges -->
-    <div class="card detail-card">
-      <h3>Charges mensuelles</h3>
-      <div class="detail-list">
-        <div class="detail-row" *ngFor="let c of chargesEntries">
-          <span class="dl">{{ c.label }}</span>
-          <span class="dv neg-light">−{{ formatCurrency(c.value) }}</span>
-        </div>
-        <div class="detail-row" *ngIf="investment.creditMensuel > 0">
-          <span class="dl">Crédit mensuel</span>
-          <span class="dv neg-light">−{{ formatCurrency(investment.creditMensuel) }}</span>
-        </div>
-        <div class="detail-separator"></div>
-        <div class="detail-row total">
-          <span class="dl">Total charges</span>
-          <span class="dv">{{ formatCurrency(metrics.totalChargesMensuelles) }}</span>
+    <!-- Barre d'avancement -->
+    <div class="card progress-card">
+      <div class="progress-header">
+        <span>Avancement</span>
+        <span>{{ (d.depenseTransformation / d.budgetTransformation * 100) | number:'1.0-0' }}%
+          · {{ fmt(d.depenseTransformation) }} / {{ fmt(d.budgetTransformation) }}</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill"
+             [style.width.%]="d.depenseTransformation / d.budgetTransformation * 100"
+             [class.over]="d.depenseTransformation > d.budgetTransformation">
         </div>
       </div>
     </div>
 
-    <!-- Revenus -->
-    <div class="card detail-card">
-      <h3>Revenus mensuels</h3>
-      <div class="detail-list">
-        <div class="detail-row" *ngFor="let r of revenusEntries">
-          <span class="dl">{{ r.label }}</span>
-          <span class="dv pos-light">+{{ formatCurrency(r.value) }}</span>
+    <!-- Bar chart dépenses mensuelles -->
+    <div class="card" *ngIf="hasBar()">
+      <h3>Dépenses mensuelles</h3>
+      <div class="chart-responsive" #lineChartHost>
+        <ngx-charts-bar-vertical-2d
+          [results]="barData"
+          [scheme]="colorScheme"
+          [xAxis]="true"
+          [yAxis]="true"
+          [legend]="true"
+          [showDataLabel]="true"
+          [view]="lineView">
+        </ngx-charts-bar-vertical-2d>
+      </div>
+    </div>
+  </ng-container>
+
+  <!-- ══════════════════════════════════════════════════════════
+       SECTION TYPE A — Détails financement
+  ══════════════════════════════════════════════════════════ -->
+  <ng-container *ngIf="isTypeA() && investment.detailTypeA as d">
+    <div class="section-title">Détails</div>
+    <div class="bien-info-row">
+      <div class="info-chip" *ngIf="d.localisation">📍 {{ d.localisation }}</div>
+      <div class="info-chip">🏠 {{ investService.label('categorieBien', d.categorieBien) }} <span *ngIf="d.surface">· {{ d.surface }} m²</span></div>
+      <div class="info-chip" *ngIf="d.regimeGestion">⚖️ {{ investService.label('regimeGestion', d.regimeGestion) | uppercase }}</div>
+      <div class="info-chip" *ngIf="d.tauxFinancement">🏦 Taux {{ d.tauxFinancement }}%</div>
+      <div class="info-chip" *ngIf="d.soldeFinancementRestant">💳 Solde restant dû : {{ fmt(d.soldeFinancementRestant) }}</div>
+    </div>
+  </ng-container>
+
+  <!-- ══════════════════════════════════════════════════════════
+       BILAN FINANCIER — générique (type A, type H à cash-flow…)
+       Intègre capital investi + charges/revenus cumulés depuis
+       l'historique + tous les événements ponctuels.
+  ══════════════════════════════════════════════════════════ -->
+  <ng-container *ngIf="(isTypeA() || isTypeHAvecCashflow()) && bilanFinancier as b">
+
+    <div class="section-title">Bilan réel depuis le début</div>
+
+    <!-- Bloc Ce que ça a coûté -->
+    <div class="activite-bloc cout-bloc">
+      <div class="activite-bloc-title">
+        <span class="activite-icon">💸</span> Ce que ça a coûté en tout
+      </div>
+      <div class="activite-kpis">
+        <div class="activite-kpi">
+          <div class="kl">Capital investi</div>
+          <div class="kv neg-light">−{{ fmt(b.capitalInvesti) }}</div>
         </div>
-        <div class="detail-separator"></div>
-        <div class="detail-row total">
-          <span class="dl">Total revenus</span>
-          <span class="dv">{{ formatCurrency(metrics.totalRevenusMensuels) }}</span>
+        <div class="activite-sep">+</div>
+        <div class="activite-kpi">
+          <div class="kl">Charges cumulées (historique)</div>
+          <div class="kv neg-light">−{{ fmt(b.chargesCumulees) }}</div>
+        </div>
+        <div class="activite-sep">+</div>
+        <div class="activite-kpi">
+          <div class="kl">Frais & dépenses événements</div>
+          <div class="kv neg-light">−{{ fmt(b.totalEvenementsNegatifs) }}</div>
+          <div class="kl mt4">travaux · imprévus · frais</div>
+        </div>
+        <div class="activite-sep">=</div>
+        <div class="activite-kpi activite-kpi-total">
+          <div class="kl">Coût total réel engagé</div>
+          <div class="kv" style="color:#f87171; font-size:19px">−{{ fmt(b.coutTotalReel) }}</div>
         </div>
       </div>
     </div>
 
-    <!-- Dépenses imprévues -->
-    <div class="card detail-card" *ngIf="investment.depensesImprevues.length">
-      <h3>Dépenses imprévues</h3>
-      <div class="detail-list">
-        <div class="detail-row" *ngFor="let d of investment.depensesImprevues">
-          <div>
-            <div class="dl">{{ d.description }}</div>
-            <div class="ds">{{ d.date | date:'dd/MM/yyyy' }}</div>
+    <!-- Bloc Ce que ça a rapporté -->
+    <div class="activite-bloc revenus-bloc">
+      <div class="activite-bloc-title">
+        <span class="activite-icon">💰</span> Ce que ça a rapporté jusqu'à aujourd'hui
+      </div>
+      <div class="activite-kpis">
+        <div class="activite-kpi">
+          <div class="kl">Revenus encaissés (historique)</div>
+          <div class="kv pos-light">+{{ fmt(b.revenusCumules) }}</div>
+        </div>
+        <div class="activite-sep">+</div>
+        <div class="activite-kpi">
+          <div class="kl">Plus-value latente</div>
+          <div class="kv" [class.pos-light]="b.plusValueLatente >= 0" [class.neg-light]="b.plusValueLatente < 0">
+            {{ b.plusValueLatente >= 0 ? '+' : '' }}{{ fmt(b.plusValueLatente) }}
           </div>
-          <span class="dv neg-light">−{{ formatCurrency(d.montant) }}</span>
+          <div class="kl mt4">non réalisée · à la valeur actuelle</div>
+        </div>
+        <ng-container *ngIf="b.totalEvenementsPositifs > 0">
+          <div class="activite-sep">+</div>
+          <div class="activite-kpi">
+            <div class="kl">Remboursements / indemnités</div>
+            <div class="kv pos-light">+{{ fmt(b.totalEvenementsPositifs) }}</div>
+          </div>
+        </ng-container>
+      </div>
+    </div>
+
+    <!-- Bilan net double lecture -->
+    <div class="bilan-net-row">
+      <!-- Sans plus-value (cash réel) -->
+      <div class="card bilan-card"
+           [class.bilan-pos]="b.gainNetSansPatrimoine >= 0"
+           [class.bilan-neg]="b.gainNetSansPatrimoine < 0">
+        <div class="bilan-card-title">Gain net cash (hors revalorisation)</div>
+        <div class="bilan-card-sub">Revenus encaissés − coûts réels</div>
+        <div class="bilan-card-value"
+             [style.color]="b.gainNetSansPatrimoine >= 0 ? '#34d399' : '#f87171'">
+          {{ b.gainNetSansPatrimoine >= 0 ? '+' : '' }}{{ fmt(b.gainNetSansPatrimoine) }}
+        </div>
+        <div class="bilan-card-note">
+          Ce montant sera positif quand les revenus auront remboursé l'intégralité de ce que vous avez dépensé.
+        </div>
+      </div>
+
+      <!-- Avec plus-value (vision patrimoine) -->
+      <div class="card bilan-card"
+           [class.bilan-pos]="b.gainNetAvecPatrimoine >= 0"
+           [class.bilan-neg]="b.gainNetAvecPatrimoine < 0">
+        <div class="bilan-card-title">Gain net total (avec revalorisation)</div>
+        <div class="bilan-card-sub">Gain cash + plus-value latente</div>
+        <div class="bilan-card-value"
+             [style.color]="b.gainNetAvecPatrimoine >= 0 ? '#34d399' : '#f87171'">
+          {{ b.gainNetAvecPatrimoine >= 0 ? '+' : '' }}{{ fmt(b.gainNetAvecPatrimoine) }}
+        </div>
+        <div class="bilan-card-note">
+          Vision patrimoine complète : si vous cédiez l'actif aujourd'hui à sa valeur estimée.
+        </div>
+      </div>
+    </div>
+
+    <!-- Jauge rentabilité -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="rentabilite-header">
+        <div>
+          <h3 style="margin-bottom:4px">Progression vers le seuil de rentabilité</h3>
+          <p class="rentabilite-sub" *ngIf="!b.seuilRentabiliteAtteint">
+            Il manque encore <strong>{{ fmt(-b.gainNetSansPatrimoine) }}</strong> de revenus pour couvrir tous les coûts.
+          </p>
+          <p class="rentabilite-sub pos-light" *ngIf="b.seuilRentabiliteAtteint">
+            ✅ Seuil atteint — bénéficiaire de <strong>{{ fmt(b.gainNetSansPatrimoine) }}</strong> depuis le lancement.
+          </p>
+        </div>
+        <div class="rentabilite-pct">
+          {{ (b.revenusCumules / b.coutTotalReel * 100) | number:'1.0-0' }}%
+        </div>
+      </div>
+      <div class="progress-bar" style="margin-top:10px">
+        <div class="progress-fill"
+             [style.width.%]="b.revenusCumules / b.coutTotalReel * 100 > 100 ? 100 : b.revenusCumules / b.coutTotalReel * 100"
+             [class.over]="b.seuilRentabiliteAtteint">
+        </div>
+        <!-- Marqueur 100% = seuil rentabilité -->
+        <div class="progress-target" style="left:calc(100% - 2px)"></div>
+      </div>
+      <div class="progress-legend" style="margin-top:8px">
+        <span style="color:rgba(255,255,255,0.3); font-size:11px">0%</span>
+        <span style="color:rgba(255,255,255,0.3); font-size:11px; margin-left:auto">Seuil de rentabilité ({{ fmt(b.coutTotalReel) }})</span>
+      </div>
+    </div>
+
+    <!-- Moyennes mensuelles -->
+    <div class="activite-moyennes">
+      <div class="card detail-card" *ngIf="investment!.historique.length > 0">
+        <h3>Moyennes mensuelles</h3>
+        <div class="detail-list">
+          <div class="detail-row">
+            <span class="dl">Revenus / mois en moyenne</span>
+            <span class="dv pos-light">+{{ fmt(b.revenusCumules / investment!.historique.length) }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="dl">Charges / mois en moyenne</span>
+            <span class="dv neg-light">−{{ fmt(b.chargesCumulees / investment!.historique.length) }}</span>
+          </div>
+          <div class="detail-separator"></div>
+          <div class="detail-row total">
+            <span class="dl">Marge nette / mois en moyenne</span>
+            <span class="dv" [class.pos]="(b.revenusCumules - b.chargesCumulees) / investment!.historique.length >= 0">
+              {{ fmt((b.revenusCumules - b.chargesCumulees) / investment!.historique.length) }}
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="card detail-card">
+        <h3>Résumé global</h3>
+        <div class="detail-list">
+          <div class="detail-row">
+            <span class="dl">Capital investi</span>
+            <span class="dv neg-light">−{{ fmt(b.capitalInvesti) }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="dl">Total charges (historique)</span>
+            <span class="dv neg-light">−{{ fmt(b.chargesCumulees) }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="dl">Total revenus encaissés</span>
+            <span class="dv pos-light">+{{ fmt(b.revenusCumules) }}</span>
+          </div>
+          <div class="detail-separator"></div>
+          <div class="detail-row total">
+            <span class="dl">Bilan net depuis le début</span>
+            <span class="dv" [class.pos]="b.gainNetSansPatrimoine >= 0" [class.neg]="b.gainNetSansPatrimoine < 0">
+              {{ b.gainNetSansPatrimoine >= 0 ? '+' : '' }}{{ fmt(b.gainNetSansPatrimoine) }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Détail des événements négatifs (ce qui rogne le bilan) -->
+    <div class="card" *ngIf="b.evenementsNegatifs.length" style="margin-bottom:14px">
+      <h3>Dépenses hors charges récurrentes incluses dans le bilan</h3>
+      <div class="events-list">
+        <div class="event-row" *ngFor="let e of b.evenementsNegatifs">
+          <div class="event-left">
+            <span class="event-type-dot neg"></span>
+            <div>
+              <div class="event-desc">{{ e.description }}</div>
+              <div class="event-meta">{{ e.date | date:'dd/MM/yyyy' }} · {{ e.type }}</div>
+            </div>
+          </div>
+          <span class="event-amount neg">−{{ fmt(e.montant) }}</span>
+        </div>
+        <div class="event-row" style="border-top:1px solid rgba(255,255,255,0.07); padding-top:10px; margin-top:4px">
+          <div class="event-left"><span class="dl">Total événements négatifs</span></div>
+          <span class="event-amount neg" style="font-weight:700">−{{ fmt(b.totalEvenementsNegatifs) }}</span>
+        </div>
+      </div>
+    </div>
+
+  </ng-container>
+
+  <!-- ══════════════════════════════════════════════════════════
+       SECTION INTÉRÊTS MENSUELS (investissements avec dividendes)
+  ══════════════════════════════════════════════════════════ -->
+  <ng-container *ngIf="interetsStats">
+    <div class="section-title">Intérêts & dividendes reçus</div>
+    <div class="kpi-row" style="margin-bottom: 16px">
+      <div class="kpi-box accent">
+        <div class="kl">Total encaissé</div>
+        <div class="kv pos-light">+{{ fmt(interetsStats.total) }}</div>
+        <div class="kl mt4">sur {{ interetsStats.nbMois }} mois</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kl">Moyenne mensuelle</div>
+        <div class="kv">{{ fmt(interetsStats.moyenne) }}</div>
+        <div class="kl mt4">/mois</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kl">Meilleur mois</div>
+        <div class="kv pos-light">{{ fmt(interetsStats.max) }}</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kl">Plus faible mois</div>
+        <div class="kv">{{ fmt(interetsStats.min) }}</div>
+      </div>
+      <div class="kpi-box" *ngIf="investment">
+        <div class="kl">Rendement réel encaissé</div>
+        <div class="kv">{{ (interetsStats.total / investment.capitalInvesti * 100) | number:'1.2-2' }}%</div>
+        <div class="kl mt4">sur capital investi</div>
+      </div>
+    </div>
+  </ng-container>
+
+  <!-- ══════════════════════════════════════════════════════════
+       GRAPHIQUES PRINCIPAUX
+  ══════════════════════════════════════════════════════════ -->
+  <div class="charts-row" *ngIf="hasMainChart() || hasPie()">
+
+    <!-- Investissements avec intérêts : bar chart mensuel + line cumulé -->
+    <div class="card chart-line-card" *ngIf="hasMainChart() && interetsStats">
+      <h3>Intérêts & dividendes reçus — mois par mois</h3>
+      <div class="chart-responsive" #lineChartHost>
+        <ngx-charts-bar-vertical
+          [results]="mainChartData[0].series"
+          [scheme]="colorScheme"
+          [xAxis]="true"
+          [yAxis]="true"
+          [legend]="false"
+          [gradient]="false"
+          [barPadding]="4"
+          [showDataLabel]="true"
+          [view]="lineView">
+        </ngx-charts-bar-vertical>
+      </div>
+      <!-- Ligne cumulée juste en dessous -->
+      <div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.06)">
+        <div style="font-size:12px; color:rgba(255,255,255,0.35); margin-bottom:6px">Intérêts cumulés</div>
+        <div class="chart-responsive">
+          <ngx-charts-line-chart
+            [results]="[mainChartData[1]]"
+            [scheme]="colorScheme"
+            [xAxis]="true"
+            [yAxis]="true"
+            [legend]="false"
+            [autoScale]="true"
+            [curve]="curve"
+            [view]="lineView">
+          </ngx-charts-line-chart>
+        </div>
+      </div>
+    </div>
+
+    <!-- Autres types : line chart standard -->
+    <div class="card chart-line-card" *ngIf="hasMainChart() && !interetsStats">
+      <h3>
+        <ng-container *ngIf="isTypeA() || isTypeHAvecCashflow()">Évolution revenus / charges / cash-flow</ng-container>
+        <ng-container *ngIf="isFinancier()">Évolution de la valeur du portefeuille</ng-container>
+        <ng-container *ngIf="isTypeF()">Intérêts cumulés & capital</ng-container>
+      </h3>
+      <div class="chart-responsive" #lineChartHost>
+        <ngx-charts-line-chart
+          [results]="mainChartData"
+          [scheme]="colorScheme"
+          [xAxis]="true"
+          [yAxis]="true"
+          [legend]="true"
+          [autoScale]="true"
+          [curve]="curve"
+          [view]="lineView">
+        </ngx-charts-line-chart>
+      </div>
+    </div>
+
+    <!-- Donut pie -->
+    <!--ici-->
+    <div class="card chart-pie-card" *ngIf="hasPie()" #pieChartHost>
+      <h3>
+        <ng-container *ngIf="isTypeA() || isTypeHAvecCashflow()">Répartition revenus / charges</ng-container>
+        <ng-container *ngIf="investment.type === 'type_d'">Répartition des supports</ng-container>
+        <ng-container *ngIf="investment.type === 'type_c'">Répartition du portefeuille</ng-container>
+        <ng-container *ngIf="investment.type === 'type_e'">Répartition des actifs</ng-container>
+        <ng-container *ngIf="isTypeB()">Budget détaillé</ng-container>
+      </h3>
+      <div class="chart-responsive">
+        <ngx-charts-pie-chart
+          [results]="pieData"
+          [scheme]="colorScheme"
+          [legend]="true"
+          [legendPosition]="LegendPosition.Right"
+          [labels]="true"
+          [maxLabelLength]="24"
+          [doughnut]="true"
+          [arcWidth]="0.38">
+        </ngx-charts-pie-chart>
+      </div>
+    </div>
+  </div>
+
+  <!-- Graphique secondaire : évolution valeur portefeuille -->
+  <div class="charts-row" *ngIf="hasSecondChart()">
+    <div class="card chart-line-card" style="flex:1">
+      <h3>Évolution de la valeur du portefeuille</h3>
+      <div class="chart-responsive" #secondChartHost>
+        <ngx-charts-line-chart
+          [results]="secondChartData"
+          [scheme]="colorScheme"
+          [xAxis]="true"
+          [yAxis]="true"
+          [legend]="true"
+          [autoScale]="true"
+          [curve]="curve"
+          [view]="lineView">
+        </ngx-charts-line-chart>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════
+       LIGNES TYPE C
+  ══════════════════════════════════════════════════════════ -->
+  <ng-container *ngIf="lignesTypeC.length">
+    <div class="section-title">Lignes du portefeuille</div>
+    <div class="card">
+      <table class="data-table">
+        <thead><tr>
+          <th>Code</th><th>Nom</th><th class="r">Qté</th>
+          <th class="r">PRU</th><th class="r">Valeur act.</th>
+          <th class="r">+/−</th><th class="r">Perf.</th>
+        </tr></thead>
+        <tbody>
+        <tr *ngFor="let l of lignesTypeC">
+          <td><span class="ticker">{{ l.code }}</span></td>
+          <td>{{ l.nom }}</td>
+          <td class="r mono">{{ l.quantite }}</td>
+          <td class="r mono">{{ fmt(l.prixMoyenAcquisition) }}</td>
+          <td class="r mono">{{ fmt(l.quantite * l.valeurActuelle) }}</td>
+          <td class="r mono" [class.pos]="l.valeurActuelle >= l.prixMoyenAcquisition" [class.neg]="l.valeurActuelle < l.prixMoyenAcquisition">
+            {{ fmt((l.valeurActuelle - l.prixMoyenAcquisition) * l.quantite) }}
+          </td>
+          <td class="r mono" [class.pos]="l.valeurActuelle >= l.prixMoyenAcquisition" [class.neg]="l.valeurActuelle < l.prixMoyenAcquisition">
+            {{ ((l.valeurActuelle - l.prixMoyenAcquisition) / l.prixMoyenAcquisition * 100) | number:'1.1-1' }}%
+          </td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+  </ng-container>
+
+  <!-- ══════════════════════════════════════════════════════════
+       LIGNES TYPE E
+  ══════════════════════════════════════════════════════════ -->
+  <ng-container *ngIf="lignesTypeE.length">
+    <div class="section-title">Actifs</div>
+    <div class="card">
+      <table class="data-table">
+        <thead><tr>
+          <th>Code</th><th>Nom</th><th class="r">Quantité</th>
+          <th class="r">Prix moy. acq.</th><th class="r">Prix actuel</th>
+          <th class="r">Valeur</th><th class="r">Perf.</th>
+        </tr></thead>
+        <tbody>
+        <tr *ngFor="let l of lignesTypeE">
+          <td><span class="ticker">{{ l.code }}</span></td>
+          <td>{{ l.nom }}</td>
+          <td class="r mono">{{ l.quantite }}</td>
+          <td class="r mono">{{ fmt(l.prixMoyenAcquisition) }}</td>
+          <td class="r mono">{{ fmt(l.valeurActuelle) }}</td>
+          <td class="r mono">{{ fmt(l.quantite * l.valeurActuelle) }}</td>
+          <td class="r mono" [class.pos]="l.valeurActuelle >= l.prixMoyenAcquisition" [class.neg]="l.valeurActuelle < l.prixMoyenAcquisition">
+            {{ ((l.valeurActuelle - l.prixMoyenAcquisition) / l.prixMoyenAcquisition * 100) | number:'1.1-1' }}%
+          </td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+  </ng-container>
+
+  <!-- ══════════════════════════════════════════════════════════
+       RÉPARTITION TYPE D
+  ══════════════════════════════════════════════════════════ -->
+  <ng-container *ngIf="repartitionTypeD.length">
+    <div class="section-title">Supports & répartition</div>
+    <div class="card">
+      <table class="data-table">
+        <thead><tr>
+          <th>Support</th><th>Type</th><th class="r">Montant</th>
+          <th class="r">%</th><th class="r">Rdt annuel</th>
+        </tr></thead>
+        <tbody>
+        <tr *ngFor="let r of repartitionTypeD">
+          <td>{{ r.support }}</td>
+          <td><span class="tag">{{ investService.label('categorieRepartitionTypeD', r.categorie) }}</span></td>
+          <td class="r mono">{{ fmt(r.montant) }}</td>
+          <td class="r mono">{{ r.pourcentage }}%</td>
+          <td class="r mono" *ngIf="r.rendementAnnuel !== undefined">{{ r.rendementAnnuel }}%</td>
+          <td class="r" *ngIf="r.rendementAnnuel === undefined">—</td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+  </ng-container>
+
+  <!-- ══════════════════════════════════════════════════════════
+       CHARGES & REVENUS RÉCURRENTS (types A, F)
+  ══════════════════════════════════════════════════════════ -->
+  <div class="details-row" *ngIf="hasChargesOuRevenus()">
+    <div class="card detail-card" *ngIf="investment.chargesRecurrentes.length">
+      <h3>Charges récurrentes</h3>
+      <div class="detail-list">
+        <div class="detail-row" *ngFor="let c of investment.chargesRecurrentes">
+          <div>
+            <span class="dl">{{ c.label }}</span>
+            <span class="freq-badge">{{ c.frequence }}</span>
+          </div>
+          <span class="dv neg-light">−{{ fmt(investService.toMensuel(c.montant, c.frequence)) }}/mois</span>
         </div>
         <div class="detail-separator"></div>
         <div class="detail-row total">
-          <span class="dl">Total imprévus</span>
-          <span class="dv">{{ formatCurrency(metrics.totalDepensesImprevues) }}</span>
+          <span class="dl">Total mensuel</span>
+          <span class="dv">{{ fmt(metrics.chargesMensuelles) }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card detail-card" *ngIf="investment.revenusRecurrents.length">
+      <h3>Revenus récurrents</h3>
+      <div class="detail-list">
+        <div class="detail-row" *ngFor="let r of investment.revenusRecurrents">
+          <div>
+            <span class="dl">{{ r.label }}</span>
+            <span class="freq-badge">{{ r.frequence }}</span>
+          </div>
+          <span class="dv pos-light">+{{ fmt(investService.toMensuel(r.montant, r.frequence)) }}/mois</span>
+        </div>
+        <div class="detail-separator"></div>
+        <div class="detail-row total">
+          <span class="dl">Total mensuel</span>
+          <span class="dv">{{ fmt(metrics.revenusMensuelsBruts) }}</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Notes -->
+  <!-- ══════════════════════════════════════════════════════════
+       ÉVÉNEMENTS
+  ══════════════════════════════════════════════════════════ -->
+  <ng-container *ngIf="investment.evenements.length">
+    <div class="section-title">Événements</div>
+    <div class="card">
+      <div class="events-list">
+        <div class="event-row" *ngFor="let e of investment.evenements">
+          <div class="event-left">
+            <span class="event-type-dot" [class.neg]="e.montant < 0" [class.pos]="e.montant > 0" [class.neutral]="e.montant === 0"></span>
+            <div>
+              <div class="event-desc">{{ e.description }}</div>
+              <div class="event-meta">{{ e.date | date:'dd/MM/yyyy' }} · <span class="event-type-label">{{ e.type | titlecase }}</span></div>
+            </div>
+          </div>
+          <span class="event-amount" [class.pos]="e.montant > 0" [class.neg]="e.montant < 0" *ngIf="e.montant !== 0">
+            {{ e.montant > 0 ? '+' : '' }}{{ fmt(e.montant) }}
+          </span>
+          <span class="event-amount neutral" *ngIf="e.montant === 0">— opération</span>
+        </div>
+      </div>
+    </div>
+  </ng-container>
+
+  <!-- ── Notes ── -->
   <div class="card notes-card" *ngIf="investment.notes">
     <h3>Notes</h3>
     <p>{{ investment.notes }}</p>
   </div>
+
 </div>
 
 <div class="loading-state" *ngIf="loading">
