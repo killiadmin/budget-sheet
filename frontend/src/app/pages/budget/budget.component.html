@@ -12,19 +12,15 @@
       <div class="kl">Revenus nets mensuels</div>
       <div class="kv">{{ formatCurrency(budget.profil.revenuMensuelNet) }}</div>
     </div>
-    <div class="kpi-box" [class.danger]="depenseMoisActuel > budget.profil.revenuMensuelNet">
-      <div class="kl">Dépenses décembre</div>
-      <div class="kv">{{ formatCurrency(depenseMoisActuel) }}</div>
-    </div>
-    <div class="kpi-box" [class.success]="soldeMensuelMoyen > 0">
-      <div class="kl">Solde mensuel moyen</div>
-      <div class="kv" [class.pos]="soldeMensuelMoyen >= 0" [class.neg]="soldeMensuelMoyen < 0">
-        {{ soldeMensuelMoyen >= 0 ? '+' : '' }}{{ formatCurrency(soldeMensuelMoyen) }}
-      </div>
-    </div>
     <div class="kpi-box">
       <div class="kl">Charges fixes mensuelles</div>
       <div class="kv">{{ formatCurrency(totalFixesMensuel) }}</div>
+    </div>
+    <div class="kpi-box" [class.success]="soldeMensuel > 0" [class.danger]="soldeMensuel < 0">
+      <div class="kl">Solde après charges fixes</div>
+      <div class="kv" [class.pos]="soldeMensuel >= 0" [class.neg]="soldeMensuel < 0">
+        {{ soldeMensuel >= 0 ? '+' : '' }}{{ formatCurrency(soldeMensuel) }}
+      </div>
     </div>
     <div class="kpi-box">
       <div class="kl">Objectif épargne</div>
@@ -36,14 +32,14 @@
   <!-- Progress bar dépenses vs revenu -->
   <div class="progress-card">
     <div class="progress-header">
-      <span>Taux de dépenses · Décembre 2024</span>
-      <span>{{ depensesVsBudget | number:'1.0-0' }}% du revenu net</span>
+      <span>Charges fixes vs revenu net</span>
+      <span>{{ depensesVsRevenu | number:'1.0-0' }}% du revenu net</span>
     </div>
     <div class="progress-bar">
       <div class="progress-fill"
-           [style.width.%]="depensesVsBudget"
-           [class.over]="depensesVsBudget > 100"
-           [class.warn]="depensesVsBudget > 80 && depensesVsBudget <= 100">
+           [style.width.%]="depensesVsRevenu"
+           [class.over]="depensesVsRevenu > 100"
+           [class.warn]="depensesVsRevenu > 80 && depensesVsRevenu <= 100">
       </div>
       <div class="progress-target" [style.left.%]="100 - tauxEpargneObjectif"></div>
     </div>
@@ -57,18 +53,15 @@
   <!-- Charts Row 1 -->
   <div class="charts-row">
     <div class="card chart-card">
-      <h3>Évolution des dépenses vs revenus</h3>
-      <ngx-charts-line-chart
-        [results]="evolutionDepensesData"
+      <h3>Comparaison des postes fixes</h3>
+      <ngx-charts-bar-horizontal
+        [results]="comparaisonPostesData"
         [scheme]="colorScheme"
         [xAxis]="true"
         [yAxis]="true"
-        [legend]="true"
-        [autoScale]="false"
-        [yScaleMin]="1500"
-        [yScaleMax]="4000"
-        [view]="[540, 260]">
-      </ngx-charts-line-chart>
+        [showDataLabel]="true"
+        [view]="[540, 300]">
+      </ngx-charts-bar-horizontal>
     </div>
 
     <div class="card pie-card">
@@ -76,57 +69,52 @@
       <ngx-charts-pie-chart
         [results]="repartitionFixeData"
         [scheme]="colorScheme"
-        [legend]="true"
+        [legend]="false"
         [labels]="true"
         [maxLabelLength]="24"
         [doughnut]="true"
         [arcWidth]="0.38"
-        [view]="[340, 280]">
+        [view]="[500, 300]">
       </ngx-charts-pie-chart>
     </div>
   </div>
 
-  <!-- Stacked bar catégories -->
-  <div class="card full-card">
-    <h3>Dépenses par catégorie · 6 derniers mois</h3>
-    <ngx-charts-bar-vertical-stacked
-      [results]="depensesParCategorieData"
-      [scheme]="colorScheme"
-      [xAxis]="true"
-      [yAxis]="true"
-      [legend]="true"
-      [view]="[960, 280]"
-      [barPadding]="12"
-      [showDataLabel]="true">
-    </ngx-charts-bar-vertical-stacked>
-  </div>
-
   <!-- Charges fixes table -->
   <div class="card">
-    <h3>Détail des charges fixes mensuelles</h3>
+    <div class="table-header">
+      <h3>Détail des charges fixes mensuelles</h3>
+      <div class="filter-actions">
+        <span class="filter-hint">Décochez un poste pour l'exclure des totaux et des graphiques</span>
+        <button type="button" class="btn-link" (click)="selectAll()">Tout cocher</button>
+        <button type="button" class="btn-link" (click)="selectNone()">Tout décocher</button>
+      </div>
+    </div>
     <table class="charges-table">
       <thead>
       <tr>
+        <th class="check-col"></th>
         <th>Poste</th>
-        <th>Catégorie</th>
         <th class="right">Montant</th>
         <th class="right">% du revenu</th>
       </tr>
       </thead>
       <tbody>
-      <tr *ngFor="let d of budget.depensesFixesMensuelles">
+      <tr *ngFor="let d of budget.postesFixes" [class.row-excluded]="!isSelected(d.id)">
+        <td class="check-col">
+          <input type="checkbox" [checked]="isSelected(d.id)" (change)="togglePoste(d.id)" />
+        </td>
         <td>
           <div class="charge-name">
             <span class="charge-dot" [style.background]="d.couleur"></span>
-            {{ d.label }}
+            {{ posteLabel(d.id) }}
           </div>
         </td>
-        <td><span class="cat-badge">{{ d.categorie }}</span></td>
-        <td class="right mono">{{ formatCurrency(d.montant) }}</td>
-        <td class="right mono muted">{{ (d.montant / budget.profil.revenuMensuelNet * 100) | number:'1.1-1' }}%</td>
+        <td class="right mono">{{ formatCurrency(d.montantMensuel) }}</td>
+        <td class="right mono muted">{{ (d.montantMensuel / budget.profil.revenuMensuelNet * 100) | number:'1.1-1' }}%</td>
       </tr>
       <tr class="total-row">
-        <td colspan="2"><strong>Total charges fixes</strong></td>
+        <td class="check-col"></td>
+        <td><strong>Total charges fixes (sélection)</strong></td>
         <td class="right mono"><strong>{{ formatCurrency(totalFixesMensuel) }}</strong></td>
         <td class="right mono"><strong>{{ (totalFixesMensuel / budget.profil.revenuMensuelNet * 100) | number:'1.0-0' }}%</strong></td>
       </tr>

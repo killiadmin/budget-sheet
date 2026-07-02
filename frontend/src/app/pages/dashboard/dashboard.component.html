@@ -42,9 +42,9 @@
         <div class="kpi-sub">Revenus récurrents cumulés</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Dépenses moy./mois</div>
+        <div class="kpi-label">Charges fixes/mois</div>
         <div class="kpi-value">{{ fmt(depensesMoyennesMensuelles) }}</div>
-        <div class="kpi-sub">Moyenne 12 mois</div>
+        <div class="kpi-sub">Postes fixes suivis</div>
       </div>
       <div class="kpi-card" [class.kpi-success]="tauxEpargne > 20">
         <div class="kpi-label">Taux d'épargne</div>
@@ -66,7 +66,7 @@
         </div>
       </div>
       <div class="chart-card chart-wide">
-        <div class="chart-header"><h3>Dépenses par catégorie</h3><span class="chart-period">Moyenne mensuelle 2024</span></div>
+        <div class="chart-header"><h3>Dépenses par poste fixe</h3><span class="chart-period">Charges fixes actuelles</span></div>
         <div class="chart-responsive" #barHorizontalHost>
           <ngx-charts-bar-horizontal
             [results]="depensesChartData" [scheme]="colorScheme"

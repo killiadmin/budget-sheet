@@ -2,7 +2,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule, CurrencyPipe, DecimalPipe } from '@angular/common';
 import {NgxChartsModule, Color, ScaleType} from '@swimlane/ngx-charts';
 import { BudgetService } from '../../services/budget.service';
-import { BudgetData } from '../../models/budget.model';
+import { BudgetData, PosteBudget } from '../../models/budget.model';
 
 @Component({
   selector: 'app-budget',
@@ -16,16 +16,16 @@ export class BudgetComponent implements OnInit {
   budget: BudgetData | null = null;
   loading = true;
 
+  // Filtre d'affichage : postes inclus dans les totaux/graphiques
+  private selectedIds = new Set<string>();
+
   // Charts
-  depensesParCategorieData: any[] = [];
-  evolutionDepensesData: any[] = [];
   repartitionFixeData: any[] = [];
+  comparaisonPostesData: any[] = [];
 
   // Computed
   totalFixesMensuel = 0;
-  soldeMensuelMoyen = 0;
-  depenseMoisActuel = 0;
-  moisSelectionne = '2024-12';
+  soldeMensuel = 0;
 
   colorScheme: Color = {
     name: 'budget',
@@ -37,60 +37,70 @@ export class BudgetComponent implements OnInit {
   ngOnInit() {
     this.budgetService.getBudget().subscribe(data => {
       this.budget = data;
-      this.compute();
-      this.prepareCharts();
+      this.selectedIds = new Set(data.postesFixes.map(p => p.id));
+      this.refresh();
       this.loading = false;
     });
   }
 
+  private get postesAffiches(): PosteBudget[] {
+    if (!this.budget) return [];
+    return this.budget.postesFixes.filter(p => this.selectedIds.has(p.id));
+  }
+
+  private refresh() {
+    this.compute();
+    this.prepareCharts();
+  }
+
   private compute() {
     if (!this.budget) return;
-    this.totalFixesMensuel = this.budget.depensesFixesMensuelles.reduce((s, d) => s + d.montant, 0);
-    const hist = this.budget.historiqueDepenses;
-    this.soldeMensuelMoyen = this.budget.profil.revenuMensuelNet -
-      (hist.reduce((s, h) => s + h.total, 0) / hist.length);
-    this.depenseMoisActuel = hist[hist.length - 1]?.total ?? 0;
+    this.totalFixesMensuel = this.postesAffiches.reduce((s, d) => s + d.montantMensuel, 0);
+    this.soldeMensuel = this.budget.profil.revenuMensuelNet - this.totalFixesMensuel;
   }
 
   private prepareCharts() {
-    if (!this.budget) return;
+    const postes = this.postesAffiches;
 
-    // Répartition par catégorie (dépenses fixes)
-    this.repartitionFixeData = this.budget.depensesFixesMensuelles.map(d => ({
-      name: d.label,
-      value: d.montant
+    // Répartition par poste
+    this.repartitionFixeData = postes.map(d => ({
+      name: this.posteLabel(d.id),
+      value: d.montantMensuel
     }));
 
-    // Évolution mensuelle totale
-    this.evolutionDepensesData = [{
-      name: 'Dépenses totales',
-      series: this.budget.historiqueDepenses.map(h => ({
-        name: this.shortMonth(h.mois),
-        value: h.total
-      }))
-    }, {
-      name: 'Revenu net',
-      series: this.budget.historiqueDepenses.map(h => ({
-        name: this.shortMonth(h.mois),
-        value: this.budget!.profil.revenuMensuelNet
-      }))
-    }];
-
-    // Par catégorie : stacked bar
-    const categories = ['Logement', 'Transport', 'Alimentation', 'Santé', 'Loisirs', 'Épargne', 'Divers'];
-    this.depensesParCategorieData = categories.map(cat => ({
-      name: cat,
-      series: this.budget!.historiqueDepenses.slice(-6).map(h => ({
-        name: this.shortMonth(h.mois),
-        value: h.details.find(d => d.categorie === cat)?.montant ?? 0
-      }))
-    }));
+    // Comparaison des postes, du plus élevé au plus faible
+    this.comparaisonPostesData = postes
+      .slice()
+      .sort((a, b) => b.montantMensuel - a.montantMensuel)
+      .map(d => ({ name: this.posteLabel(d.id), value: d.montantMensuel }));
   }
 
-  private shortMonth(mois: string): string {
-    const [, m] = mois.split('-');
-    const months = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
-    return months[parseInt(m, 10) - 1];
+  isSelected(id: string): boolean {
+    return this.selectedIds.has(id);
+  }
+
+  togglePoste(id: string) {
+    if (this.selectedIds.has(id)) {
+      this.selectedIds.delete(id);
+    } else {
+      this.selectedIds.add(id);
+    }
+    this.refresh();
+  }
+
+  selectAll() {
+    if (!this.budget) return;
+    this.selectedIds = new Set(this.budget.postesFixes.map(p => p.id));
+    this.refresh();
+  }
+
+  selectNone() {
+    this.selectedIds.clear();
+    this.refresh();
+  }
+
+  posteLabel(id: string): string {
+    return this.budgetService.posteLabel(id);
   }
 
   formatCurrency(v: number): string {
@@ -102,8 +112,8 @@ export class BudgetComponent implements OnInit {
     return (this.budget.profil.epargneObjectif / this.budget.profil.revenuMensuelNet) * 100;
   }
 
-  get depensesVsBudget(): number {
+  get depensesVsRevenu(): number {
     if (!this.budget) return 0;
-    return (this.depenseMoisActuel / this.budget.profil.revenuMensuelNet) * 100;
+    return (this.totalFixesMensuel / this.budget.profil.revenuMensuelNet) * 100;
   }
 }

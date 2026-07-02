@@ -1,20 +1,10 @@
-export interface DepenseFixe {
+// Les libellés réels ne figurent jamais ici : chaque poste est identifié par un
+// code opaque (id) dont le libellé humain est résolu à l'exécution depuis
+// assets/data/budget-labels.json (non versionné, voir .gitignore /src/assets/data).
+export interface PosteBudget {
   id: string;
-  categorie: string;
-  label: string;
-  montant: number;
+  montantMensuel: number;
   couleur: string;
-}
-
-export interface DepenseMensuelleDetail {
-  categorie: string;
-  montant: number;
-}
-
-export interface HistoriqueDepenseMois {
-  mois: string;
-  total: number;
-  details: DepenseMensuelleDetail[];
 }
 
 export interface ProfilBudget {
@@ -27,6 +17,5 @@ export interface ProfilBudget {
 
 export interface BudgetData {
   profil: ProfilBudget;
-  depensesFixesMensuelles: DepenseFixe[];
-  historiqueDepenses: HistoriqueDepenseMois[];
+  postesFixes: PosteBudget[];
 }

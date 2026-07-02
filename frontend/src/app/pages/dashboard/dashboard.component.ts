@@ -137,8 +137,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     }, 0);
 
     if (this.budget) {
-      const hist = this.budget.historiqueDepenses;
-      this.depensesMoyennesMensuelles = hist.reduce((s, h) => s + h.total, 0) / hist.length;
+      this.depensesMoyennesMensuelles = this.budget.postesFixes.reduce((s, p) => s + p.montantMensuel, 0);
       const revenu = this.budget.profil.revenuMensuelNet + this.revenusInvestissements;
       this.tauxEpargne = ((revenu - this.depensesMoyennesMensuelles) / revenu) * 100;
     }
@@ -164,19 +163,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       }))
     }));
 
-    // Dépenses par catégorie
+    // Dépenses par poste fixe
     if (this.budget) {
-      const catSum: Record<string, number> = {};
-      const catCnt: Record<string, number> = {};
-      this.budget.historiqueDepenses.forEach(m => {
-        m.details.forEach(d => {
-          catSum[d.categorie] = (catSum[d.categorie] ?? 0) + d.montant;
-          catCnt[d.categorie] = (catCnt[d.categorie] ?? 0) + 1;
-        });
-      });
-      this.depensesChartData = Object.entries(catSum).map(([name, total]) => ({
-        name, value: Math.round(total / (catCnt[name] || 1))
-      }));
+      this.depensesChartData = this.budget.postesFixes
+        .slice()
+        .sort((a, b) => b.montantMensuel - a.montantMensuel)
+        .map(p => ({ name: this.budgetService.posteLabel(p.id), value: p.montantMensuel }));
     }
 
     // Évolution types financiers (C + D)
