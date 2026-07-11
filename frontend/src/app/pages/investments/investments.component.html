@@ -46,7 +46,21 @@
             <div class="sheet-type">{{ investService.typeLabel(inv.type) }}</div>
           </div>
         </div>
-        <div class="sheet-status" [class.active]="inv.statut === 'actif'">{{ inv.statut }}</div>
+        <div class="sheet-header-right">
+          <span class="update-flag"
+                [class.fresh]="!investService.miseAJourPerimee(inv)"
+                [class.stale]="investService.miseAJourPerimee(inv)"
+                [title]="inv.dateDerniereMiseAJour
+                  ? 'Dernière mise à jour le ' + (inv.dateDerniereMiseAJour | date:'dd/MM/yyyy')
+                  : 'Jamais mis à jour'">
+            <span class="update-dot"></span>
+            <ng-container *ngIf="inv.dateDerniereMiseAJour; else jamaisMaj">
+              il y a {{ investService.joursDepuisMiseAJour(inv) }} j
+            </ng-container>
+            <ng-template #jamaisMaj>jamais MàJ</ng-template>
+          </span>
+          <div class="sheet-status" [class.active]="inv.statut === 'actif'">{{ inv.statut }}</div>
+        </div>
       </div>
 
       <!-- Métriques adaptées au type -->

@@ -91,15 +91,11 @@ export class InvestmentDetailComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   get joursDepuisMiseAJour(): number | null {
-    if (!this.investment?.dateDerniereMiseAJour) return null;
-    const derniere = new Date(this.investment.dateDerniereMiseAJour);
-    return Math.floor((Date.now() - derniere.getTime()) / (1000 * 60 * 60 * 24));
+    return this.investment ? this.investService.joursDepuisMiseAJour(this.investment) : null;
   }
 
-  // Considérée périmée (rouge) au-delà de 2 mois, ou si jamais mise à jour
   get miseAJourPerimee(): boolean {
-    const jours = this.joursDepuisMiseAJour;
-    return jours === null || jours > 60;
+    return this.investment ? this.investService.miseAJourPerimee(this.investment) : true;
   }
 
   private updateSizes() {

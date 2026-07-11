@@ -53,6 +53,17 @@ export class InvestmentService {
     );
   }
 
+  joursDepuisMiseAJour(inv: Investment): number | null {
+    if (!inv.dateDerniereMiseAJour) return null;
+    const derniere = new Date(inv.dateDerniereMiseAJour);
+    return Math.floor((Date.now() - derniere.getTime()) / (1000 * 60 * 60 * 24));
+  }
+
+  miseAJourPerimee(inv: Investment): boolean {
+    const jours = this.joursDepuisMiseAJour(inv);
+    return jours === null || jours > 60;
+  }
+
   /**
    * Converts an amount to a monthly equivalent based on its frequency.
    * 
