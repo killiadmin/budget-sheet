@@ -592,10 +592,11 @@
     <div class="card detail-card" *ngIf="investment.chargesRecurrentes.length">
       <h3>Charges récurrentes</h3>
       <div class="detail-list">
-        <div class="detail-row" *ngFor="let c of investment.chargesRecurrentes">
+        <div class="detail-row" *ngFor="let c of investment.chargesRecurrentes" [class.informatif]="c.informatif">
           <div>
             <span class="dl">{{ c.label }}</span>
             <span class="freq-badge">{{ c.frequence }}</span>
+            <span class="freq-badge" *ngIf="c.informatif" title="Déjà inclus dans une autre charge — exclu du total">hors total</span>
           </div>
           <span class="dv neg-light">−{{ fmt(investService.toMensuel(c.montant, c.frequence)) }}/mois</span>
         </div>

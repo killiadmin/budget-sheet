@@ -71,6 +71,7 @@ export interface ChargeRecurrente {
   label: string;
   montant: number;
   frequence: Frequence;
+  informatif?: boolean;   // affichée dans le détail mais exclue du total (ex: montant déjà inclus dans une autre charge)
 }
 
 // ─────────────────────────────────────────────────────────────

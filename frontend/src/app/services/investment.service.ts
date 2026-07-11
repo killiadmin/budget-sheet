@@ -44,10 +44,9 @@ export class InvestmentService {
   }
 
   totalChargesMensuelles(inv: Investment): number {
-    return inv.chargesRecurrentes.reduce(
-      (s, c) => s + this.toMensuel(c.montant, c.frequence),
-      0,
-    );
+    return inv.chargesRecurrentes
+      .filter((c) => !c.informatif)
+      .reduce((s, c) => s + this.toMensuel(c.montant, c.frequence), 0);
   }
 
   totalRevenusMensuels(inv: Investment): number {

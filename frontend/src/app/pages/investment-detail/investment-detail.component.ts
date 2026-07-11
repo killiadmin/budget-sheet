@@ -123,7 +123,9 @@ export class InvestmentDetailComponent implements OnInit, AfterViewInit, OnDestr
 
       // Pie charges récurrentes (si présentes), sinon pie revenus vs charges cumulés
       if (inv.chargesRecurrentes.length > 0) {
-        this.pieData = inv.chargesRecurrentes.map(c => ({ name: c.label, value: c.montant }));
+        this.pieData = inv.chargesRecurrentes
+          .filter(c => !c.informatif)
+          .map(c => ({ name: c.label, value: c.montant }));
       } else {
         // Résumé revenus/charges depuis l'historique
         const totalRev = series.reduce((s, h) => s + (h.revenus ?? 0), 0);
