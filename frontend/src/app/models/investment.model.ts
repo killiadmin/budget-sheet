@@ -194,6 +194,7 @@ export interface Investment {
   color: string;
   dateOuverture: string;         // date de création / acquisition
   dateFermeture?: string;        // si clôturé
+  dateDerniereMiseAJour?: string; // dernière mise à jour manuelle des données (YYYY-MM-DD)
   statut: 'actif' | 'cloture' | 'vendu';
   tags?: string[];
 

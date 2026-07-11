@@ -29,6 +29,7 @@ export class InvestmentDetailComponent implements OnInit, AfterViewInit, OnDestr
   metrics: InvestmentMetrics | null = null;
   bilanFinancier: ReturnType<InvestmentService['bilanFinancier']> | null = null;
   loading = true;
+  updatingDate = false;
 
   mainChartData:   any[] = [];
   secondChartData: any[] = [];   // évolution valeur (quand mainChart = intérêts)
@@ -75,6 +76,31 @@ export class InvestmentDetailComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   ngOnDestroy() { this.resizeObserver?.disconnect(); }
+
+  // ── Date de dernière mise à jour manuelle ───────────────────────
+  onUpdateDate() {
+    if (!this.investment || this.updatingDate) return;
+    this.updatingDate = true;
+    this.investService.markAsUpdated(this.investment.id).subscribe({
+      next: ({ dateDerniereMiseAJour }) => {
+        this.investment!.dateDerniereMiseAJour = dateDerniereMiseAJour;
+        this.updatingDate = false;
+      },
+      error: () => { this.updatingDate = false; },
+    });
+  }
+
+  get joursDepuisMiseAJour(): number | null {
+    if (!this.investment?.dateDerniereMiseAJour) return null;
+    const derniere = new Date(this.investment.dateDerniereMiseAJour);
+    return Math.floor((Date.now() - derniere.getTime()) / (1000 * 60 * 60 * 24));
+  }
+
+  // Considérée périmée (rouge) au-delà de 2 mois, ou si jamais mise à jour
+  get miseAJourPerimee(): boolean {
+    const jours = this.joursDepuisMiseAJour;
+    return jours === null || jours > 60;
+  }
 
   private updateSizes() {
     if (this.lineChartHost?.nativeElement) {

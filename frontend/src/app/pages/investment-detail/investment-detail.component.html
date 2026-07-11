@@ -19,6 +19,21 @@
         </div>
       </div>
     </div>
+
+    <button type="button" class="update-date-btn"
+            [class.stale]="miseAJourPerimee" [class.fresh]="!miseAJourPerimee"
+            [disabled]="updatingDate"
+            (click)="onUpdateDate()">
+      <span class="update-dot"></span>
+      <span class="update-text">
+        <ng-container *ngIf="investment.dateDerniereMiseAJour; else jamaisMiseAJour">
+          Mis à jour le {{ investment.dateDerniereMiseAJour | date:'dd/MM/yyyy' }}
+          <span class="update-sub">il y a {{ joursDepuisMiseAJour }} j</span>
+        </ng-container>
+        <ng-template #jamaisMiseAJour>Jamais mis à jour</ng-template>
+      </span>
+    </button>
+
     <div class="status-badge" [class.active]="investment.statut === 'actif'">
       {{ investment.statut }}
     </div>

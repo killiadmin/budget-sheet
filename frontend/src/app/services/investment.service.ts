@@ -29,6 +29,15 @@ export class InvestmentService {
     return this.getAll().pipe(map((list) => list.find((i) => i.id === id)));
   }
 
+  // Persiste la date du jour comme date de dernière mise à jour manuelle,
+  // directement dans investments.json (via le petit serveur d'écriture local).
+  markAsUpdated(id: string): Observable<{ id: string; dateDerniereMiseAJour: string }> {
+    return this.http.patch<{ id: string; dateDerniereMiseAJour: string }>(
+      `/api/investments/${id}/date`,
+      {},
+    );
+  }
+
   // ── Conversion fréquence → montant mensuel ──────────────────
   toMensuel(montant: number, frequence: string): number {
     switch (frequence) {

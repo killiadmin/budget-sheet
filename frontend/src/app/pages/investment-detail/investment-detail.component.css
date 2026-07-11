@@ -70,6 +70,65 @@ h1 {
   color: rgba(255,255,255,0.4);
 }
 
+/* ── Bouton mise à jour ──────────────────────────────────────── */
+.update-date-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid transparent;
+  background: rgba(255,255,255,0.07);
+  color: rgba(255,255,255,0.5);
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-left: auto;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+
+.update-date-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.12);
+}
+
+.update-date-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.update-date-btn .update-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.update-date-btn .update-sub {
+  opacity: 0.7;
+  margin-left: 4px;
+}
+
+.update-date-btn.fresh {
+  background: rgba(52,211,153,0.12);
+  border-color: rgba(52,211,153,0.3);
+  color: #34d399;
+}
+
+.update-date-btn.fresh .update-dot {
+  background: #34d399;
+}
+
+.update-date-btn.stale {
+  background: rgba(248,113,113,0.12);
+  border-color: rgba(248,113,113,0.3);
+  color: #f87171;
+}
+
+.update-date-btn.stale .update-dot {
+  background: #f87171;
+}
+
 .status-badge {
   font-size: 12px;
   padding: 4px 12px;
