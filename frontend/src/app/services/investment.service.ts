@@ -74,6 +74,14 @@ export class InvestmentService {
     );
   }
 
+  // ── Mois restants sur un financement (type A) ───────────────
+  moisRestantsFinancement(inv: Investment): number | null {
+    const d = inv.detailTypeA;
+    if (!d?.dureeFinancement) return null;
+    const moisEcoules = this.dureeDetentionMois(inv);
+    return Math.max(0, d.dureeFinancement - moisEcoules) + 1;
+  }
+
   // ── Calcul des métriques selon le type ──────────────────────
   computeMetrics(inv: Investment): InvestmentMetrics {
     const chargesMensuelles = this.totalChargesMensuelles(inv);

@@ -176,6 +176,8 @@
       <div class="info-chip" *ngIf="d.regimeGestion">⚖️ {{ investService.label('regimeGestion', d.regimeGestion) | uppercase }}</div>
       <div class="info-chip" *ngIf="d.tauxFinancement">🏦 Taux {{ d.tauxFinancement }}%</div>
       <div class="info-chip" *ngIf="d.soldeFinancementRestant">💳 Solde restant dû : {{ fmt(d.soldeFinancementRestant) }}</div>
+      <div class="info-chip" *ngIf="d.dureeFinancement">📅 Crédit sur {{ d.dureeFinancement }} mois</div>
+      <div class="info-chip" *ngIf="d.dureeFinancement">⏳ {{ investService.moisRestantsFinancement(investment) }} mois restants</div>
     </div>
   </ng-container>
 
