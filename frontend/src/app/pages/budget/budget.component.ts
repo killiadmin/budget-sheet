@@ -4,6 +4,9 @@ import {NgxChartsModule, Color, ScaleType} from '@swimlane/ngx-charts';
 import { BudgetService } from '../../services/budget.service';
 import { BudgetData, PosteBudget } from '../../models/budget.model';
 
+/**
+ * BudgetComponent is responsible for displaying the user's budget information,
+ */
 @Component({
   selector: 'app-budget',
   imports: [CommonModule, NgxChartsModule, CurrencyPipe, DecimalPipe],
@@ -16,14 +19,11 @@ export class BudgetComponent implements OnInit {
   budget: BudgetData | null = null;
   loading = true;
 
-  // Filtre d'affichage : postes inclus dans les totaux/graphiques
   private selectedIds = new Set<string>();
 
-  // Charts
   repartitionFixeData: any[] = [];
   comparaisonPostesData: any[] = [];
 
-  // Computed
   totalFixesMensuel = 0;
   soldeMensuel = 0;
 
@@ -34,6 +34,9 @@ export class BudgetComponent implements OnInit {
     domain: ['#818cf8', '#34d399', '#f59e0b', '#f87171', '#a78bfa', '#38bdf8', '#fb923c', '#4ade80']
   };
 
+  /**
+   * Lifecycle hook that is called after the component has been initialized.
+   */
   ngOnInit() {
     this.budgetService.getBudget().subscribe(data => {
       this.budget = data;
@@ -62,13 +65,11 @@ export class BudgetComponent implements OnInit {
   private prepareCharts() {
     const postes = this.postesAffiches;
 
-    // Répartition par poste
     this.repartitionFixeData = postes.map(d => ({
       name: this.posteLabel(d.id),
       value: d.montantMensuel
     }));
 
-    // Comparaison des postes, du plus élevé au plus faible
     this.comparaisonPostesData = postes
       .slice()
       .sort((a, b) => b.montantMensuel - a.montantMensuel)

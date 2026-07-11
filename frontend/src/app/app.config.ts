@@ -8,6 +8,11 @@ import { routes } from './app.routes';
 
 registerLocaleData(localeFr);
 
+/**
+ * Application configuration for the Angular app,
+ *  including providers for zone change detection,
+ *  routing, HTTP client, animations, and locale settings.
+ */
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),

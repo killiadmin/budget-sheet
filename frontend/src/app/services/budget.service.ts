@@ -6,9 +6,6 @@ import { BudgetData } from '../models/budget.model';
 @Injectable({ providedIn: 'root' })
 export class BudgetService {
   private http = inject(HttpClient);
-
-  // Libellés humains chargés depuis un fichier non versionné (voir .gitignore
-  // /src/assets/data) : le code source ne contient aucun libellé de poste réel.
   private labels: Record<string, Record<string, string>> = {};
 
   constructor() {

@@ -7,17 +7,26 @@ import {
   InvestmentType,
 } from '../models/investment.model';
 
+/**
+ * Service for managing investments, 
+ * providing methods to retrieve investment data, compute metrics, 
+ * and handle labels for different investment types and attributes.
+ */
 @Injectable({ providedIn: 'root' })
 export class InvestmentService {
   private http = inject(HttpClient);
-
-  // Libellés humains chargés depuis un fichier non versionné (voir .gitignore
-  // /src/assets/data) : le code source ne contient aucun nom de catégorie réel.
   private labels: Record<string, Record<string, string>> = {};
 
+  /**
+   * Constructor for the InvestmentService.
+   * Initializes the service and loads investment labels from a JSON file.
+   * The labels are used for displaying human-readable names for investment types and attributes.
+   */
   constructor() {
     this.http
-      .get<Record<string, Record<string, string>>>('assets/data/investment-labels.json')
+      .get<
+        Record<string, Record<string, string>>
+      >('assets/data/investment-labels.json')
       .subscribe((labels) => (this.labels = labels));
   }
 
@@ -29,16 +38,28 @@ export class InvestmentService {
     return this.getAll().pipe(map((list) => list.find((i) => i.id === id)));
   }
 
-  // Persiste la date du jour comme date de dernière mise à jour manuelle,
-  // directement dans investments.json (via le petit serveur d'écriture local).
-  markAsUpdated(id: string): Observable<{ id: string; dateDerniereMiseAJour: string }> {
+  /**
+   * Marks an investment as updated.
+   * 
+   * @param id 
+   * @returns 
+   */
+  markAsUpdated(
+    id: string,
+  ): Observable<{ id: string; dateDerniereMiseAJour: string }> {
     return this.http.patch<{ id: string; dateDerniereMiseAJour: string }>(
       `/api/investments/${id}/date`,
       {},
     );
   }
 
-  // ── Conversion fréquence → montant mensuel ──────────────────
+  /**
+   * Converts an amount to a monthly equivalent based on its frequency.
+   * 
+   * @param montant 
+   * @param frequence 
+   * @returns 
+   */
   toMensuel(montant: number, frequence: string): number {
     switch (frequence) {
       case 'mensuel':
@@ -52,12 +73,24 @@ export class InvestmentService {
     }
   }
 
+  /**
+   * Computes the total monthly charges for an investment.
+   * 
+   * @param inv 
+   * @returns 
+   */
   totalChargesMensuelles(inv: Investment): number {
     return inv.chargesRecurrentes
       .filter((c) => !c.informatif)
       .reduce((s, c) => s + this.toMensuel(c.montant, c.frequence), 0);
   }
 
+  /**
+   * Computes the total monthly revenues for an investment.
+   * 
+   * @param inv 
+   * @returns 
+   */
   totalRevenusMensuels(inv: Investment): number {
     return inv.revenusRecurrents.reduce(
       (s, r) => s + this.toMensuel(r.montant, r.frequence),
@@ -65,7 +98,12 @@ export class InvestmentService {
     );
   }
 
-  // ── Durée de détention en mois ──────────────────────────────
+  /**
+   * Computes the duration of investment holding in months.
+   * 
+   * @param inv 
+   * @returns 
+   */
   dureeDetentionMois(inv: Investment): number {
     const debut = new Date(inv.dateOuverture);
     const fin = inv.dateFermeture ? new Date(inv.dateFermeture) : new Date();
@@ -74,7 +112,12 @@ export class InvestmentService {
     );
   }
 
-  // ── Mois restants sur un financement (type A) ───────────────
+  /**
+   * Computes the remaining months for financing.
+   * 
+   * @param inv 
+   * @returns 
+   */
   moisRestantsFinancement(inv: Investment): number | null {
     const d = inv.detailTypeA;
     if (!d?.dureeFinancement) return null;
@@ -82,7 +125,12 @@ export class InvestmentService {
     return Math.max(0, d.dureeFinancement - moisEcoules) + 1;
   }
 
-  // ── Calcul des métriques selon le type ──────────────────────
+  /**
+   * Computes the metrics for an investment.
+   * 
+   * @param inv 
+   * @returns 
+   */
   computeMetrics(inv: Investment): InvestmentMetrics {
     const chargesMensuelles = this.totalChargesMensuelles(inv);
     const revenusMensuelsBruts = this.totalRevenusMensuels(inv);
@@ -98,10 +146,7 @@ export class InvestmentService {
 
     const dureeAns = dureeDetentionMois / 12 || 1;
 
-    // Plus-value / performance — base de calcul selon le type (voir switch ci-dessous)
     let plusValueLatente = inv.valeurActuelle - inv.capitalInvesti;
-
-    // Métriques spécifiques
     let rentabiliteBrute: number | undefined;
     let rentabiliteNette: number | undefined;
     let margeRevente: number | undefined;
@@ -164,8 +209,6 @@ export class InvestmentService {
       }
 
       case 'type_h': {
-        // Si l'historique contient des revenus/charges (activité annexe)
-        // on calcule un cashflow moyen depuis l'historique réel
         const entriesWithData = inv.historique.filter(
           (h) => h.revenus !== undefined || h.charges !== undefined,
         );
@@ -179,14 +222,10 @@ export class InvestmentService {
             0,
           );
           const moisAvecDonnees = entriesWithData.length;
-          // Override les métriques avec la moyenne réelle de l'historique
           const revMoyenMois = totalRev / moisAvecDonnees;
           const chgMoyenMois = totalChg / moisAvecDonnees;
-          // On retourne dans le bloc général avec les bonnes valeurs
-          // Les métriques revenusMensuelsBruts / chargesMensuelles sont déjà calculées
-          // depuis chargesRecurrentes/revenusRecurrents — si vides, on les corrige ici
+
           if (revenusMensuelsBruts === 0 && totalRev > 0) {
-            // pas de revenusRecurrents mais historique présent → calcul depuis historique
             rendementAnnuelNet =
               inv.capitalInvesti > 0
                 ? ((totalRev - totalChg) / inv.capitalInvesti / dureeAns) * 100
@@ -197,9 +236,6 @@ export class InvestmentService {
       }
     }
 
-    // Performance / ROI — calculés après le switch pour rester cohérents
-    // avec le plusValueLatente final (ex: base prixAcquisition pour le type A,
-    // margeRevente pour le type B).
     const performancePct =
       inv.capitalInvesti > 0
         ? (plusValueLatente / inv.capitalInvesti) * 100
@@ -230,50 +266,55 @@ export class InvestmentService {
     };
   }
 
-  // ── Labels lisibles (chargés depuis le fichier non versionné) ──
+  /**
+   * Retrieves the label for a given group and code.
+   * 
+   * @param group 
+   * @param code 
+   * @returns 
+   */
   label(group: string, code: string | undefined): string {
     if (!code) return '';
     return this.labels[group]?.[code] ?? code;
   }
 
+  /**
+   * Retrieves the label for a given investment type.
+   * 
+   * @param type 
+   * @returns 
+   */
   typeLabel(type: InvestmentType): string {
     return this.label('type', type);
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Bilan financier générique : intègre capital investi, charges/
-  // revenus cumulés depuis l'historique, ET tous les événements
-  // ponctuels (frais, travaux, imprévus, remboursements...).
-  // Utilisable par tout type dont l'historique suit le schéma
-  // revenus/charges (type A, type H à cash-flow, etc.) : les mêmes
-  // règles s'appliquent, seul le libellé change selon le type
-  // dans le composant.
-  // ─────────────────────────────────────────────────────────────
+  /**
+   * Computes the financial statement for an investment.
+   * 
+   * @param inv 
+   * @returns 
+   */
   bilanFinancier(inv: Investment): {
-    // ── Coûts ──────────────────────────────────────────────────
-    capitalInvesti: number; // apport initial (bien, machine, fonds de départ...)
-    chargesCumulees: number; // charges/dépenses réelles payées (historique)
-    totalEvenementsNegatifs: number; // frais, travaux, imprévus... en plus des charges
-    coutTotalReel: number; // capital + charges + événements négatifs
+    capitalInvesti: number;
+    chargesCumulees: number;
+    totalEvenementsNegatifs: number;
+    coutTotalReel: number;
 
-    // ── Revenus ────────────────────────────────────────────────
-    revenusCumules: number; // revenus réellement encaissés (historique)
-    plusValueLatente: number; // valeur actuelle − valeur/prix d'acquisition
-    totalEvenementsPositifs: number; // remboursements, indemnités, ventes ponctuelles...
+    revenusCumules: number;
+    plusValueLatente: number;
+    totalEvenementsPositifs: number;
 
-    // ── Bilan ──────────────────────────────────────────────────
-    gainNetSansPatrimoine: number; // revenus − (charges + événements négatifs + capital)
-    gainNetAvecPatrimoine: number; // gainNet + plus-value latente
+    gainNetSansPatrimoine: number;
+    gainNetAvecPatrimoine: number;
     cashflowCumuleParMois: {
       date: string;
       cumul: number;
       revenus: number;
       charges: number;
     }[];
-    seuilRentabiliteAtteint: boolean; // gainNetSansPatrimoine >= 0
-    moisPourRentabilite: number | null; // 1er mois où le cumul repasse positif
+    seuilRentabiliteAtteint: boolean;
+    moisPourRentabilite: number | null;
 
-    // ── Détail des événements ──────────────────────────────────
     evenementsNegatifs: {
       date: string;
       description: string;
@@ -287,7 +328,6 @@ export class InvestmentService {
       type: string;
     }[];
   } {
-    // Revenus et charges réels depuis l'historique
     const revenusCumules = inv.historique.reduce(
       (s, h) => s + (h.revenus ?? 0),
       0,
@@ -297,7 +337,6 @@ export class InvestmentService {
       0,
     );
 
-    // Événements séparés en positifs / négatifs
     const evenementsNegatifs = inv.evenements
       .filter((e) => e.montant < 0)
       .map((e) => ({
@@ -325,16 +364,13 @@ export class InvestmentService {
       0,
     );
 
-    // Coût total réel = capital engagé + charges payées + frais/travaux/imprévus
     const capitalInvesti = inv.capitalInvesti;
     const coutTotalReel =
       capitalInvesti + chargesCumulees + totalEvenementsNegatifs;
 
-    // Plus-value latente : sur le prix d'acquisition si connu (type A), sinon sur le capital investi
     const prixAcquisition = inv.detailTypeA?.prixAcquisition ?? capitalInvesti;
     const plusValueLatente = inv.valeurActuelle - prixAcquisition;
 
-    // Gain net sans compter la revalorisation du bien/actif
     const gainNetSansPatrimoine =
       revenusCumules +
       totalEvenementsPositifs -
@@ -342,17 +378,15 @@ export class InvestmentService {
       totalEvenementsNegatifs -
       capitalInvesti;
 
-    // Gain net en comptant la plus-value latente (vision patrimoine total)
     const gainNetAvecPatrimoine = gainNetSansPatrimoine + plusValueLatente;
 
-    // Courbe cumulée mois par mois : on démarre dans le rouge (capital + événements
-    // négatifs déjà engagés, événements positifs déjà perçus), puis on ajoute le
-    // cash-flow réel mois par mois. On repère au passage le 1er mois où le cumul
-    // redevient positif (seuil de rentabilité).
-    let cumul =
-      -capitalInvesti - totalEvenementsNegatifs + totalEvenementsPositifs;
+    let cumul = -capitalInvesti - totalEvenementsNegatifs + totalEvenementsPositifs;
     let moisPourRentabilite: number | null = null;
     let moisIndex = 0;
+
+    /**
+     * Computes the cumulative cash flow per month based on the investment's history.
+     */
     const cashflowCumuleParMois = inv.historique.map((h) => {
       const revenus = h.revenus ?? 0;
       const charges = h.charges ?? 0;

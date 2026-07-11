@@ -1,9 +1,3 @@
-// ─────────────────────────────────────────────────────────────
-// Types d'investissements supportés
-// Libellés humains chargés à l'exécution depuis un fichier non
-// versionné (voir InvestmentService.loadLabels) — volontairement
-// absents du code source.
-// ─────────────────────────────────────────────────────────────
 export type InvestmentType =
   | 'type_a'
   | 'type_b'
@@ -14,34 +8,25 @@ export type InvestmentType =
   | 'type_g'
   | 'type_h';
 
-// ─────────────────────────────────────────────────────────────
-// Entrées d'historique — shape différente selon le type
-// ─────────────────────────────────────────────────────────────
-export interface HistoriqueEntry {
-  date: string;           // YYYY-MM
 
-  // Flux périodiques
+export interface HistoriqueEntry {
+  date: string;
+
   revenus?: number;
   charges?: number;
   cashflow?: number;
 
-  // Valorisation / mouvements de portefeuille
   valeurPortefeuille?: number;
   versement?: number;
   plusValueRealisee?: number;
 
-  // Dépenses ponctuelles liées à une opération
   depenseTravaux?: number;
   depenseFrais?: number;
 
-  // Rendement périodique
   interets?: number;
   capitalRestant?: number;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Événements ponctuels (travaux, incident, arbitrage, etc.)
-// ─────────────────────────────────────────────────────────────
 export type EvenementType =
   | 'depense_imprevue'
   | 'travaux'
@@ -57,13 +42,11 @@ export interface Evenement {
   id: string;
   date: string;
   type: EvenementType;
-  montant: number;         // positif = entrée, négatif = sortie
+  montant: number; 
   description: string;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Charges récurrentes (label libre + fréquence)
-// ─────────────────────────────────────────────────────────────
+
 export type Frequence = 'mensuel' | 'trimestriel' | 'annuel' | 'unique';
 
 export interface ChargeRecurrente {
@@ -71,25 +54,15 @@ export interface ChargeRecurrente {
   label: string;
   montant: number;
   frequence: Frequence;
-  informatif?: boolean;   // affichée dans le détail mais exclue du total (ex: montant déjà inclus dans une autre charge)
+  informatif?: boolean;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Revenus récurrents
-// ─────────────────────────────────────────────────────────────
 export interface RevenuRecurrent {
   id: string;
   label: string;
   montant: number;
   frequence: Frequence;
 }
-
-// ─────────────────────────────────────────────────────────────
-// Données spécifiques par type — optionnelles selon le cas.
-// Les noms de champs et les codes de valeurs sont volontairement
-// génériques : les libellés humains vivent uniquement dans le
-// fichier de labels non versionné.
-// ─────────────────────────────────────────────────────────────
 
 export interface DetailTypeA {
   localisation?: string;
@@ -100,10 +73,10 @@ export interface DetailTypeA {
   depenseInitiale: number;
   chargeFinancementMensuelle: number;
   tauxFinancement?: number;
-  dureeFinancement?: number;          // mois
+  dureeFinancement?: number;
   soldeFinancementRestant?: number;
   regimeGestion?: 'r1' | 'r2' | 'r3' | 'r4';
-  tauxUtilisationCible?: number;      // %
+  tauxUtilisationCible?: number;
 }
 
 export interface DetailTypeB {
@@ -114,11 +87,11 @@ export interface DetailTypeB {
   budgetTransformation: number;
   depenseTransformation: number;
   valeurCibleSortie: number;
-  valeurReelleSortie?: number;        // rempli si finalisé
+  valeurReelleSortie?: number;
   dateMiseEnCirculation?: string;
   dateSortie?: string;
   fraisIntermediaireSortie?: number;
-  margeBrute?: number;                // calculée à la sortie
+  margeBrute?: number;
 }
 
 export interface DetailTypeC {
@@ -142,7 +115,7 @@ export interface DetailTypeD {
   dateOuverture: string;
   repartition: RepartitionTypeD[];
   versementMensuelProgramme: number;
-  fraisGestionAnnuels: number;        // %
+  fraisGestionAnnuels: number;
 }
 
 export interface RepartitionTypeD {
@@ -169,8 +142,8 @@ export interface LigneTypeE {
 export interface DetailTypeF {
   intermediaire: string;
   categorieProjet: 'c1' | 'c2' | 'c3' | 'autre';
-  tauxInteretAnnuel: number;          // %
-  dureeProjet: number;                // mois
+  tauxInteretAnnuel: number;
+  dureeProjet: number;
   dateEcheance: string;
   statutRemboursement: 'en_cours' | 'rembourse' | 'retard' | 'defaut';
 }
@@ -178,41 +151,33 @@ export interface DetailTypeF {
 export interface DetailTypeG {
   fournisseur: string;
   categorieProduit: 'p1' | 'p2' | 'p3' | 'p4' | 'p5' | 'autre';
-  tauxAnnuel: number;                 // %
+  tauxAnnuel: number;
   plafond?: number;
   versementMensuel?: number;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Modèle principal Investment
-// ─────────────────────────────────────────────────────────────
 export interface Investment {
   id: string;
   name: string;
   type: InvestmentType;
   icon: string;
   color: string;
-  dateOuverture: string;         // date de création / acquisition
-  dateFermeture?: string;        // si clôturé
-  dateDerniereMiseAJour?: string; // dernière mise à jour manuelle des données (YYYY-MM-DD)
+  dateOuverture: string;
+  dateFermeture?: string;
+  dateDerniereMiseAJour?: string;
   statut: 'actif' | 'cloture' | 'vendu';
   tags?: string[];
 
-  // Financier générique
-  capitalInvesti: number;        // somme totale apportée (fonds propres)
-  valeurActuelle: number;        // valeur de marché aujourd'hui
+  capitalInvesti: number;
+  valeurActuelle: number;
 
-  // Charges et revenus récurrents (structure unifiée)
   chargesRecurrentes: ChargeRecurrente[];
   revenusRecurrents: RevenuRecurrent[];
 
-  // Événements ponctuels
   evenements: Evenement[];
 
-  // Historique mensuel
   historique: HistoriqueEntry[];
 
-  // Détails spécifiques par type (au plus un rempli)
   detailTypeA?: DetailTypeA;
   detailTypeB?: DetailTypeB;
   detailTypeC?: DetailTypeC;
@@ -224,35 +189,25 @@ export interface Investment {
   notes?: string;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Métriques calculées (agnostiques du type)
-// ─────────────────────────────────────────────────────────────
 export interface InvestmentMetrics {
-  // Commun à tous
-  plusValueLatente: number;       // valeurActuelle - capitalInvesti
-  performancePct: number;         // (plusValueLatente / capitalInvesti) * 100
-  roi: number;                    // rendement total annualisé estimé
+  plusValueLatente: number;
+  performancePct: number;
+  roi: number;
 
-  // Flux mensuels
   revenusMensuelsBruts: number;
-  chargesMensuelles: number;      // ramené au mois (quelle que soit la fréquence)
+  chargesMensuelles: number;
   cashflowMensuelNet: number;
 
-  // Rentabilité
   rentabiliteBrute?: number;
   rentabiliteNette?: number;
 
-  // Marge de sortie
   margeRevente?: number;
   margePct?: number;
 
-  // Rendement périodique
   rendementAnnuelNet?: number;
 
-  // Totaux événements
   totalEntreesEvenements: number;
   totalSortiesEvenements: number;
 
-  // Durée
   dureeDetentionMois: number;
 }

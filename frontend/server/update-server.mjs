@@ -1,7 +1,3 @@
-// Petit serveur local (dev uniquement) qui persiste sur disque la date de
-// dernière mise à jour manuelle d'un investissement. L'app Angular n'a pas
-// de backend — ce process n'existe que pour permettre au bouton "Mettre à
-// jour" de réécrire src/assets/data/investments.json.
 import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -11,11 +7,21 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_FILE = path.resolve(__dirname, '../src/assets/data/investments.json');
 const PORT = process.env.UPDATE_SERVER_PORT ?? 4300;
 
+/**
+ * Sends a JSON response.
+ * 
+ * @param {*} res 
+ * @param {*} status 
+ * @param {*} body 
+ */
 function sendJson(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(body));
 }
 
+/**
+ * Creates an HTTP server that listens for PATCH requests to update the "dateDerniereMiseAJour" field of an investment.
+ */
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const match = url.pathname.match(/^\/api\/investments\/([^/]+)\/date$/);

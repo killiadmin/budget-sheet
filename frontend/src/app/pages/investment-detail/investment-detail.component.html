@@ -1,9 +1,6 @@
 <div class="page" *ngIf="!loading && investment && metrics">
-
-  <!-- ── Navigation ── -->
   <a routerLink="/investments" class="back-link">← Retour aux investissements</a>
 
-  <!-- ── Header ── -->
   <div class="page-header" [style.--accent]="investment.color">
     <div class="header-left">
       <span class="big-icon">{{ investment.icon }}</span>
@@ -39,7 +36,6 @@
     </div>
   </div>
 
-  <!-- ── KPIs génériques ── -->
   <div class="kpi-row">
     <div class="kpi-box accent">
       <div class="kl">Valeur actuelle</div>
@@ -50,7 +46,6 @@
       <div class="kv">{{ fmt(investment.capitalInvesti) }}</div>
     </div>
 
-    <!-- Plus-value / marge selon type -->
     <ng-container *ngIf="!isTypeB()">
       <div class="kpi-box" [class.pos]="metrics.plusValueLatente >= 0" [class.neg]="metrics.plusValueLatente < 0">
         <div class="kl">Plus-value latente</div>
@@ -67,14 +62,12 @@
       </div>
     </ng-container>
 
-    <!-- Cash-flow (types A + F) -->
     <div class="kpi-box" *ngIf="hasChargesOuRevenus()"
          [class.neg]="metrics.cashflowMensuelNet < 0" [class.pos]="metrics.cashflowMensuelNet >= 0">
       <div class="kl">Cash-flow mensuel net</div>
       <div class="kv">{{ metrics.cashflowMensuelNet >= 0 ? '+' : '' }}{{ fmt(metrics.cashflowMensuelNet) }}</div>
     </div>
 
-    <!-- Rentabilités (type A) -->
     <ng-container *ngIf="isTypeA()">
       <div class="kpi-box">
         <div class="kl">Rentabilité brute</div>
@@ -86,13 +79,11 @@
       </div>
     </ng-container>
 
-    <!-- Rendement annuel (types financiers / F) -->
     <div class="kpi-box" *ngIf="(isFinancier() || isTypeF()) && metrics.rendementAnnuelNet !== undefined">
       <div class="kl">Rendement annuel net</div>
       <div class="kv">{{ metrics.rendementAnnuelNet | number:'1.2-2' }}%</div>
     </div>
 
-    <!-- ROI -->
     <div class="kpi-box">
       <div class="kl">ROI annualisé</div>
       <div class="kv" [class.pos]="metrics.roi >= 0" [class.neg]="metrics.roi < 0">
@@ -100,16 +91,12 @@
       </div>
     </div>
 
-    <!-- Événements négatifs -->
     <div class="kpi-box" *ngIf="metrics.totalSortiesEvenements > 0">
       <div class="kl">Dépenses événements</div>
       <div class="kv" style="color:#f87171">−{{ fmt(metrics.totalSortiesEvenements) }}</div>
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════
-       SECTION TYPE B — Avancement
-  ══════════════════════════════════════════════════════════ -->
   <ng-container *ngIf="isTypeB() && investment.detailTypeB as d">
     <div class="section-title">Avancement du projet</div>
     <div class="flip-progress-row">
@@ -165,9 +152,6 @@
     </div>
   </ng-container>
 
-  <!-- ══════════════════════════════════════════════════════════
-       SECTION TYPE A — Détails financement
-  ══════════════════════════════════════════════════════════ -->
   <ng-container *ngIf="isTypeA() && investment.detailTypeA as d">
     <div class="section-title">Détails</div>
     <div class="bien-info-row">
@@ -181,11 +165,6 @@
     </div>
   </ng-container>
 
-  <!-- ══════════════════════════════════════════════════════════
-       BILAN FINANCIER — générique (type A, type H à cash-flow…)
-       Intègre capital investi + charges/revenus cumulés depuis
-       l'historique + tous les événements ponctuels.
-  ══════════════════════════════════════════════════════════ -->
   <ng-container *ngIf="(isTypeA() || isTypeHAvecCashflow()) && bilanFinancier as b">
 
     <div class="section-title">Bilan réel depuis le début</div>
@@ -381,9 +360,6 @@
 
   </ng-container>
 
-  <!-- ══════════════════════════════════════════════════════════
-       SECTION INTÉRÊTS MENSUELS (investissements avec dividendes)
-  ══════════════════════════════════════════════════════════ -->
   <ng-container *ngIf="interetsStats">
     <div class="section-title">Intérêts & dividendes reçus</div>
     <div class="kpi-row" style="margin-bottom: 16px">
@@ -413,12 +389,8 @@
     </div>
   </ng-container>
 
-  <!-- ══════════════════════════════════════════════════════════
-       GRAPHIQUES PRINCIPAUX
-  ══════════════════════════════════════════════════════════ -->
   <div class="charts-row" *ngIf="hasMainChart() || hasPie()">
 
-    <!-- Investissements avec intérêts : bar chart mensuel + line cumulé -->
     <div class="card chart-line-card" *ngIf="hasMainChart() && interetsStats">
       <h3>Intérêts & dividendes reçus — mois par mois</h3>
       <div class="chart-responsive" #lineChartHost>

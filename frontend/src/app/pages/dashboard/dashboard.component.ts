@@ -25,7 +25,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('cashflowChartHost')  cashflowChartHost?: ElementRef;
   @ViewChild('evolutionChartHost') evolutionChartHost?: ElementRef;
 
-  // Tailles par défaut (avant mesure réelle du conteneur)
   pieView:            [number, number] = [380, 300];
   barHorizontalView:  [number, number] = [520, 300];
   cashflowView:        [number, number] = [960, 260];
@@ -38,7 +37,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   loading = true;
   curve = curveMonotoneX;
 
-  // KPIs
   totalPatrimoine = 0;
   totalDetteRestante = 0;
   patrimoineNet = 0;
@@ -49,7 +47,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   depensesMoyennesMensuelles = 0;
   tauxEpargne = 0;
 
-  // Charts
   patrimoineChartData: any[] = [];
   cashflowChartData: any[] = [];
   depensesChartData: any[] = [];
@@ -70,7 +67,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         this.computeKpis();
         this.prepareCharts();
         this.loading = false;
-        // Les hôtes des graphiques n'existent qu'une fois *ngIf="!loading" rendu.
+
         setTimeout(() => this.attachResizeObserver(), 0);
       });
   }
@@ -108,20 +105,16 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     if (evolutionW > 0) this.evolutionView = [Math.max(evolutionW - 180, 300), 260];
   }
 
+  /**
+   * Computes key performance indicators (KPIs) based on the current investments and budget data.
+   */
   private computeKpis() {
     this.totalPatrimoine    = this.investments.reduce((s, i) => s + i.valeurActuelle, 0);
     this.totalCapitalInvesti = this.investments.reduce((s, i) => s + i.capitalInvesti, 0);
-
-    // Somme des plus-values réelles par investissement (via computeMetrics, qui gère
-    // le calcul spécifique par type — ex: base prixAcquisition pour le type A, margeRevente
-    // pour le type B) plutôt que la formule générique totalPatrimoine - totalCapitalInvesti,
-    // qui ne correspond pas à la réalité pour un bien financé à crédit.
     this.plusValueTotale = this.investments.reduce((s, inv) => {
       return s + this.investService.computeMetrics(inv).plusValueLatente;
     }, 0);
 
-    // Dette restante (crédits en cours, type A) : la valeur actuelle d'un bien financé
-    // à crédit n'appartient pas intégralement à l'investisseur tant que le prêt court.
     this.totalDetteRestante = this.investments.reduce((s, i) => {
       return s + (i.detailTypeA?.soldeFinancementRestant ?? 0);
     }, 0);
@@ -143,8 +136,10 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  /**
+   * Prepares the data for various charts displayed on the dashboard, including patrimoine distribution, cashflow trends, and financial evolution.
+   */
   private prepareCharts() {
-    // Répartition patrimoine par type
     const byType: Record<string, number> = {};
     this.investments.forEach(inv => {
       const label = this.investService.typeLabel(inv.type as any).replace(/^. /, '');
@@ -152,7 +147,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     });
     this.patrimoineChartData = Object.entries(byType).map(([name, value]) => ({ name, value }));
 
-    // Cashflow type A, 6 derniers mois
     const typeA = this.investments.filter(i => i.type === 'type_a');
     const moisLabels = ['Jul','Aoû','Sep','Oct','Nov','Déc'];
     this.cashflowChartData = typeA.map(inv => ({
@@ -163,7 +157,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       }))
     }));
 
-    // Dépenses par poste fixe
     if (this.budget) {
       this.depensesChartData = this.budget.postesFixes
         .slice()
@@ -171,7 +164,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         .map(p => ({ name: this.budgetService.posteLabel(p.id), value: p.montantMensuel }));
     }
 
-    // Évolution types financiers (C + D)
     const financiers = this.investments.filter(i => ['type_c', 'type_d'].includes(i.type));
     this.evolutionFinancierData = financiers.map(inv => ({
       name: inv.name,
